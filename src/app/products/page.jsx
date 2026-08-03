@@ -241,18 +241,51 @@ export default function ProductsPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Image URL</label>
-                <input
-                  type="url"
-                  className="glass-input"
-                  placeholder="https://images.unsplash.com/..."
-                  value={formImage}
-                  onChange={(e) => setFormImage(e.target.value)}
-                />
+                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Product Image</label>
+                
+                {/* Image Preview Box */}
+                {formImage ? (
+                  <div style={{ position: 'relative', width: '100%', height: '140px', borderRadius: '10px', overflow: 'hidden', marginBottom: '10px', background: '#0f172a', border: '1px solid var(--border-glass)' }}>
+                    <img src={formImage} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <button
+                      type="button"
+                      onClick={() => setFormImage('')}
+                      style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(239, 68, 68, 0.8)', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : null}
+
+                <div style={{ display: 'flex', gap: '10px', flexDirection: 'column' }}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="glass-input"
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setFormImage(reader.result);
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                  <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center' }}>- OR enter Image URL below -</div>
+                  <input
+                    type="url"
+                    className="glass-input"
+                    placeholder="https://images.unsplash.com/..."
+                    value={formImage}
+                    onChange={(e) => setFormImage(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Description</label>
+                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Description (Optional)</label>
                 <textarea
                   className="glass-input"
                   rows={3}
@@ -263,7 +296,7 @@ export default function ProductsPage() {
               </div>
 
               <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.1)', fontSize: '12px', color: '#38bdf8', textAlign: 'center' }}>
-                Note: No Price field is included. Product operates on Quotation Quantity only.
+                ✓ Zero Pricing Policy: Product Name + Product Image + Quantity only.
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
