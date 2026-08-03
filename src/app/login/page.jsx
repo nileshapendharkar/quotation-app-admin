@@ -59,9 +59,9 @@ export default function LoginPage() {
           }}>
             <Shield size={28} />
           </div>
-          <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#f8fafc' }}>Admin Console Login</h1>
+          <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#f8fafc' }}>Gouri Aqua Plast Admin</h1>
           <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>
-            Product Quotation App Management
+            Ganesh Gouri Industries Pvt. Ltd. — Quotation Management
           </p>
         </div>
 
@@ -130,7 +130,7 @@ export default function LoginPage() {
         </form>
 
         <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '12px', color: '#64748b' }}>
-          Strict Policy: Product Name + Quantity Only (No Price)
+          Water Tanks, Pipes & Fittings — Product Name + Quantity Only
         </div>
       </div>
     </div>

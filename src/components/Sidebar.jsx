@@ -56,11 +56,11 @@ export default function Sidebar() {
             fontWeight: '800',
             fontSize: '18px'
           }}>
-            Q
+            G
           </div>
           <div>
-            <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#f8fafc' }}>Quotation Admin</h2>
-            <span style={{ fontSize: '11px', color: '#38bdf8', fontWeight: '600' }}>Strictly No Prices</span>
+            <h2 style={{ fontSize: '16px', fontWeight: '800', color: '#f8fafc' }}>Gouri Aqua Plast</h2>
+            <span style={{ fontSize: '11px', color: '#38bdf8', fontWeight: '600' }}>Ganesh Gouri Industries</span>
           </div>
         </div>
       </div>
@@ -109,7 +109,7 @@ export default function Sidebar() {
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#38bdf8', fontWeight: '700', marginBottom: '4px' }}>
           <ShieldAlert size={14} /> Quotation Policy
         </div>
-        All catalog items and requests operate on <strong>Product Name + Quantity</strong> only. Price fields are strictly prohibited.
+        Water Tanks, Pipes & Fittings — <strong>Product Name + Quantity</strong> only. No pricing displayed.
       </div>
 
       {/* Logout Button */}
