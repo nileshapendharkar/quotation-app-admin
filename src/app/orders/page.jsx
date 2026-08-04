@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Navbar from '@/components/Navbar';
 import { FileSpreadsheet, Download, RefreshCw, CheckCircle, Clock, XCircle } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, API_BASE } from '@/lib/api';
 
 export default function OrdersPage() {
   const [orders, setOrders] = useState([]);
@@ -35,7 +35,7 @@ export default function OrdersPage() {
 
   const handleDownloadPDF = (orderId, orderNo) => {
     const token = localStorage.getItem('admin_token');
-    const url = `http://localhost:5000/api/orders/download-pdf/${orderId}`;
+    const url = `${API_BASE}/orders/download-pdf/${orderId}`;
     fetch(url, {
       headers: { Authorization: `Bearer ${token}` }
     })
