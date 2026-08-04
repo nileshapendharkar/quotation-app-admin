@@ -101,7 +101,7 @@ export default function OrdersPage() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           {order.items.map((item, i) => (
                             <div key={i} style={{ fontSize: '13px', background: 'rgba(255,255,255,0.03)', padding: '6px 10px', borderRadius: '6px' }}>
-                              <strong>{item.productName}</strong>
+                              <strong>{item.productName}{item.size ? ` (Size: ${item.size})` : ''}</strong>
                               <span style={{ color: '#38bdf8', fontWeight: '700', marginLeft: '8px' }}>
                                 × {item.quantity} Units
                               </span>

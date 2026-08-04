@@ -19,6 +19,7 @@ export default function ProductsPage() {
   const [formImage, setFormImage] = useState('');
   const [formCategory, setFormCategory] = useState('');
   const [formDesc, setFormDesc] = useState('');
+  const [formSizes, setFormSizes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -48,6 +49,7 @@ export default function ProductsPage() {
     setFormImage('https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=500&q=80');
     setFormCategory(categories[0]?.id || '');
     setFormDesc('');
+    setFormSizes('');
     setIsModalOpen(true);
   };
 
@@ -57,6 +59,7 @@ export default function ProductsPage() {
     setFormImage(prod.image);
     setFormCategory(prod.categoryId);
     setFormDesc(prod.description || '');
+    setFormSizes(prod.sizes ? prod.sizes.join(', ') : '');
     setIsModalOpen(true);
   };
 
@@ -69,7 +72,8 @@ export default function ProductsPage() {
       name: formName,
       image: formImage,
       categoryId: formCategory,
-      description: formDesc
+      description: formDesc,
+      sizes: formSizes.split(',').map(s => s.trim()).filter(Boolean)
       // STRICTLY NO PRICE FIELD!
     };
 
@@ -179,9 +183,26 @@ export default function ProductsPage() {
                   <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#f8fafc', marginBottom: '8px' }}>
                     {product.name}
                   </h4>
-                  <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '16px', flex: 1 }}>
+                  <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '12px', flex: 1 }}>
                     {product.description || 'No description provided.'}
                   </p>
+
+                  {product.sizes && product.sizes.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
+                      {product.sizes.map((s, idx) => (
+                        <span key={idx} style={{
+                          fontSize: '11px',
+                          background: 'rgba(56, 189, 248, 0.08)',
+                          border: '1px solid rgba(56, 189, 248, 0.15)',
+                          padding: '2px 8px',
+                          borderRadius: '4px',
+                          color: '#38bdf8'
+                        }}>
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  )}
 
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid var(--border-glass)' }}>
                     <span style={{ fontSize: '12px', color: '#10b981', fontWeight: '700' }}>
@@ -292,6 +313,17 @@ export default function ProductsPage() {
                   placeholder="Product specifications and details..."
                   value={formDesc}
                   onChange={(e) => setFormDesc(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Sizes (Comma-separated, optional)</label>
+                <input
+                  type="text"
+                  className="glass-input"
+                  placeholder="e.g. 500L, 1000L, 2000L or 1/2 inch, 1 inch"
+                  value={formSizes}
+                  onChange={(e) => setFormSizes(e.target.value)}
                 />
               </div>
 
