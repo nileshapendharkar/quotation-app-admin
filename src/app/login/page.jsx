@@ -1,13 +1,13 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, Lock, Mail, ArrowRight } from 'lucide-react';
+import { Shield, Lock, User, ArrowRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState('admin@quotation.com');
-  const [password, setPassword] = useState('admin123');
+  const [userId, setUserId] = useState('Admin');
+  const [password, setPassword] = useState('GGi#4321');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -18,7 +18,7 @@ export default function LoginPage() {
 
     const res = await apiFetch('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ userId, email: userId, password })
     });
 
     setLoading(false);
@@ -61,7 +61,7 @@ export default function LoginPage() {
           </div>
           <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#f8fafc' }}>Gouri Aqua Plast Admin</h1>
           <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px' }}>
-            Ganesh Gouri Industries Pvt. Ltd. — Quotation Management
+            Ganesh Gouri Industries Pvt. Ltd. — User & Quotation Management
           </p>
         </div>
 
@@ -83,17 +83,17 @@ export default function LoginPage() {
         <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           <div>
             <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '8px', fontWeight: '600' }}>
-              Admin Email
+              Admin User ID
             </label>
             <div style={{ position: 'relative' }}>
-              <Mail size={18} color="#64748b" style={{ position: 'absolute', left: '14px', top: '14px' }} />
+              <User size={18} color="#64748b" style={{ position: 'absolute', left: '14px', top: '14px' }} />
               <input
-                type="email"
+                type="text"
                 className="glass-input"
                 style={{ paddingLeft: '44px' }}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@quotation.com"
+                value={userId}
+                onChange={(e) => setUserId(e.target.value)}
+                placeholder="Admin"
                 required
               />
             </div>
@@ -136,3 +136,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
