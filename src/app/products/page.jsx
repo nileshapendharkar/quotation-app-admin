@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Navbar from '@/components/Navbar';
 import { Plus, Search, Edit, Trash2, Package, Image as ImageIcon, Check } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getImageUrl } from '@/lib/api';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
@@ -159,7 +159,7 @@ export default function ProductsPage() {
               <div key={product.id} className="glass-card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ height: '180px', position: 'relative', background: '#000' }}>
                   <img
-                    src={product.image}
+                    src={getImageUrl(product.image)}
                     alt={product.name}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
@@ -267,7 +267,7 @@ export default function ProductsPage() {
                 {/* Image Preview Box */}
                 {formImage ? (
                   <div style={{ position: 'relative', width: '100%', height: '140px', borderRadius: '10px', overflow: 'hidden', marginBottom: '10px', background: '#0f172a', border: '1px solid var(--border-glass)' }}>
-                    <img src={formImage} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={getImageUrl(formImage)} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     <button
                       type="button"
                       onClick={() => setFormImage('')}

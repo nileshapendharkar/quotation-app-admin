@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Navbar from '@/components/Navbar';
 import { Plus, Edit, Trash2, Layers } from 'lucide-react';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getImageUrl } from '@/lib/api';
 
 export default function CategoriesPage() {
   const [categories, setCategories] = useState([]);
@@ -100,7 +100,7 @@ export default function CategoriesPage() {
             {categories.map(cat => (
               <div key={cat.id} className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ height: '140px', borderRadius: '12px', overflow: 'hidden', marginBottom: '16px' }}>
-                  <img src={cat.image} alt={cat.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={getImageUrl(cat.image)} alt={cat.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 </div>
                 <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#f8fafc', marginBottom: '6px' }}>{cat.name}</h4>
                 <p style={{ fontSize: '13px', color: '#94a3b8', flex: 1, marginBottom: '16px' }}>{cat.description || 'No description'}</p>
