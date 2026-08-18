@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Navbar from '@/components/Navbar';
-import { Users, Phone, UserPlus, FileSpreadsheet, Trash2, Eye, EyeOff, Search, CheckCircle2, AlertCircle, Upload, Key, X, Settings2, GripVertical } from 'lucide-react';
+import { Users, Phone, UserPlus, FileSpreadsheet, Trash2, Eye, EyeOff, Search, CheckCircle2, AlertCircle, Upload, Key, X, Settings2, GripVertical, Plus, Edit2, ToggleLeft, ToggleRight, MapPin, Building, Globe } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import * as XLSX from 'xlsx';
 
@@ -13,12 +13,22 @@ export default function UsersPage() {
   const [showPassMap, setShowPassMap] = useState({});
   const [feedback, setFeedback] = useState({ type: '', msg: '' });
 
+  // List of Indian States & UTs for user location drop-downs
+  const INDIAN_STATES = [
+    'Maharashtra', 'Gujarat', 'Karnataka', 'Tamil Nadu', 'Delhi', 'Uttar Pradesh',
+    'Rajasthan', 'Madhya Pradesh', 'Telangana', 'West Bengal', 'Punjab', 'Haryana',
+    'Kerala', 'Andhra Pradesh', 'Bihar', 'Assam', 'Odisha', 'Goa', 'Chhattisgarh',
+    'Jharkhand', 'Himachal Pradesh', 'Uttarakhand', 'Other'
+  ];
+
   // Dynamic Columns State
   const [columns, setColumns] = useState([
-    { id: 'userId', label: 'User ID / Mobile', visible: true },
+    { id: 'userId', label: 'User ID', visible: true },
     { id: 'password', label: 'Password', visible: true },
     { id: 'name', label: 'Account Name', visible: true },
-    { id: 'status', label: 'Status', visible: true },
+    { id: 'companyAddress', label: 'Company Physical Address', visible: true },
+    { id: 'state', label: 'State', visible: true },
+    { id: 'status', label: 'Status (Active/Inactive)', visible: true },
     { id: 'date', label: 'Created Date', visible: true },
     { id: 'actions', label: 'Actions', visible: true },
   ]);
@@ -29,15 +39,23 @@ export default function UsersPage() {
   const [showExcelModal, setShowExcelModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   
-  // Single Add form
+  // Single Add form state
   const [newUserId, setNewUserId] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newName, setNewName] = useState('');
+  const [newCompanyAddress, setNewCompanyAddress] = useState('');
+  const [newState, setNewState] = useState('Maharashtra');
+  const [newStatus, setNewStatus] = useState('Active');
   const [submitting, setSubmitting] = useState(false);
 
-  // Edit form
+  // Edit form state
   const [editUserObj, setEditUserObj] = useState(null);
+  const [editUserId, setEditUserId] = useState('');
   const [editPassword, setEditPassword] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editCompanyAddress, setEditCompanyAddress] = useState('');
+  const [editState, setEditState] = useState('Maharashtra');
+  const [editStatus, setEditStatus] = useState('Active');
 
   // Excel upload state
   const [excelRows, setExcelRows] = useState([]);
@@ -46,8 +64,7 @@ export default function UsersPage() {
 
   useEffect(() => {
     fetchUsers();
-    // Load saved columns preference if exists
-    const savedCols = localStorage.getItem('nocobase_user_cols');
+    const savedCols = localStorage.getItem('nocobase_user_cols_v3');
     if (savedCols) {
       try { setColumns(JSON.parse(savedCols)); } catch(e) {}
     }
@@ -55,7 +72,7 @@ export default function UsersPage() {
 
   const saveColumns = (newCols) => {
     setColumns(newCols);
-    localStorage.setItem('nocobase_user_cols', JSON.stringify(newCols));
+    localStorage.setItem('nocobase_user_cols_v3', JSON.stringify(newCols));
   };
 
   const fetchUsers = async () => {
@@ -73,6 +90,22 @@ export default function UsersPage() {
     setShowPassMap(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  // One-click status toggle (Active <-> Inactive) directly syncing to Couchbase
+  const handleToggleStatus = async (u) => {
+    const nextStatus = u.status === 'Inactive' ? 'Active' : 'Inactive';
+    const res = await apiFetch(`/admin/users/${u.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status: nextStatus })
+    });
+
+    if (res.success) {
+      setFeedback({ type: 'success', msg: `User "${u.userId || u.name}" status updated to ${nextStatus} and synced to Couchbase!` });
+      fetchUsers();
+    } else {
+      setFeedback({ type: 'error', msg: res.message || 'Failed to update user status' });
+    }
+  };
+
   // Add Single User
   const handleAddUser = async (e) => {
     e.preventDefault();
@@ -81,18 +114,71 @@ export default function UsersPage() {
 
     const res = await apiFetch('/admin/users', {
       method: 'POST',
-      body: JSON.stringify({ userId: newUserId, password: newPassword, name: newName })
+      body: JSON.stringify({ 
+        userId: newUserId, 
+        password: newPassword, 
+        name: newName,
+        companyAddress: newCompanyAddress,
+        state: newState,
+        status: newStatus
+      })
     });
 
     setSubmitting(false);
 
     if (res.success) {
-      setFeedback({ type: 'success', msg: `User ${newUserId} created successfully!` });
+      setFeedback({ type: 'success', msg: `User "${newUserId}" created and synced to Couchbase!` });
       setShowAddModal(false);
-      setNewUserId(''); setNewPassword(''); setNewName('');
+      setNewUserId(''); setNewPassword(''); setNewName(''); setNewCompanyAddress(''); setNewState('Maharashtra'); setNewStatus('Active');
       fetchUsers();
     } else {
       setFeedback({ type: 'error', msg: res.message || 'Error creating user' });
+    }
+  };
+
+  // Open Edit Modal
+  const openEditModal = (u) => {
+    setEditUserObj(u);
+    setEditUserId(u.userId || u.mobile || '');
+    setEditPassword('');
+    setEditName(u.name || '');
+    setEditCompanyAddress(u.companyAddress || '');
+    setEditState(u.state || 'Maharashtra');
+    setEditStatus(u.status || 'Active');
+    setShowEditModal(true);
+  };
+
+  // Submit Edit Form
+  const handleEditUserSubmit = async (e) => {
+    e.preventDefault();
+    if (!editUserObj) return;
+    setSubmitting(true);
+
+    const payload = {
+      userId: editUserId,
+      name: editName,
+      companyAddress: editCompanyAddress,
+      state: editState,
+      status: editStatus
+    };
+    if (editPassword) {
+      payload.password = editPassword;
+    }
+
+    const res = await apiFetch(`/admin/users/${editUserObj.id}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    });
+
+    setSubmitting(false);
+
+    if (res.success) {
+      setFeedback({ type: 'success', msg: `User "${editUserId}" updated and synced to Couchbase!` });
+      setShowEditModal(false);
+      setEditUserObj(null);
+      fetchUsers();
+    } else {
+      setFeedback({ type: 'error', msg: res.message || 'Failed to update user' });
     }
   };
 
@@ -117,12 +203,25 @@ export default function UsersPage() {
           const row = rawJson[i];
           if (!row || row.length === 0) continue;
           
-          let col1 = (row[0] || '').toString().trim();
-          let col2 = (row[1] || '').toString().trim();
+          let col1 = (row[0] || '').toString().trim(); // User ID
+          let col2 = (row[1] || '').toString().trim(); // Password
+          let col3 = (row[2] || '').toString().trim(); // Account Name
+          let col4 = (row[3] || '').toString().trim(); // Company Physical Address
+          let col5 = (row[4] || '').toString().trim(); // State
+          let col6 = (row[5] || '').toString().trim(); // Status
 
           if (i === 0 && (col1.toLowerCase().includes('user') || col2.toLowerCase().includes('pass'))) continue;
 
-          if (col1 && col2) parsed.push({ userId: col1, password: col2 });
+          if (col1 && col2) {
+            parsed.push({ 
+              userId: col1, 
+              password: col2,
+              name: col3,
+              companyAddress: col4,
+              state: col5,
+              status: col6 || 'Active'
+            });
+          }
         }
         setExcelRows(parsed);
       } catch (err) {
@@ -154,38 +253,15 @@ export default function UsersPage() {
     }
   };
 
-  // Update User Password
-  const handleEditPasswordSubmit = async (e) => {
-    e.preventDefault();
-    if (!editUserObj || !editPassword) return;
-    setSubmitting(true);
-
-    const res = await apiFetch(`/admin/users/${editUserObj.id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ password: editPassword })
-    });
-
-    setSubmitting(false);
-
-    if (res.success) {
-      setFeedback({ type: 'success', msg: `Password updated for User ${editUserObj.userId || editUserObj.mobile}` });
-      setShowEditModal(false);
-      setEditUserObj(null); setEditPassword('');
-      fetchUsers();
-    } else {
-      setFeedback({ type: 'error', msg: res.message || 'Failed to update password' });
-    }
-  };
-
-  // Delete User
+  // Remove / Delete User from Admin Panel
   const handleDeleteUser = async (user) => {
     const userLabel = user.userId || user.mobile || user.name;
-    if (!confirm(`Are you sure you want to delete user "${userLabel}"?`)) return;
+    if (!confirm(`Are you sure you want to remove user "${userLabel}"? This will permanently remove access and sync directly to Couchbase.`)) return;
 
     const res = await apiFetch(`/admin/users/${user.id}`, { method: 'DELETE' });
 
     if (res.success) {
-      setFeedback({ type: 'success', msg: `User ${userLabel} deleted successfully.` });
+      setFeedback({ type: 'success', msg: `User ${userLabel} removed successfully from Admin Panel and Couchbase.` });
       fetchUsers();
     } else {
       setFeedback({ type: 'error', msg: res.message || 'Failed to delete user' });
@@ -222,15 +298,17 @@ export default function UsersPage() {
     const term = search.toLowerCase();
     const uid = (u.userId || u.mobile || '').toLowerCase();
     const name = (u.name || '').toLowerCase();
-    return uid.includes(term) || name.includes(term);
+    const addr = (u.companyAddress || '').toLowerCase();
+    const st = (u.state || '').toLowerCase();
+    return uid.includes(term) || name.includes(term) || addr.includes(term) || st.includes(term);
   });
 
   const renderCell = (col, u) => {
     switch (col.id) {
       case 'userId':
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', color: '#1677ff', fontSize: '14px' }}>
-            <Phone size={15} color="#1677ff" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', color: '#4f46e5', fontSize: '14px' }}>
+            <Phone size={15} color="#4f46e5" />
             {u.userId || u.mobile}
           </div>
         );
@@ -242,7 +320,7 @@ export default function UsersPage() {
               fontFamily: isVisible ? 'monospace' : 'inherit',
               fontSize: isVisible ? '14px' : '16px',
               letterSpacing: isVisible ? '0' : '2px',
-              color: isVisible ? '#52c41a' : '#6b7280'
+              color: isVisible ? '#10b981' : '#6b7280'
             }}>
               {isVisible ? (u.plainPassword || '(Hashed)') : '••••••••'}
             </span>
@@ -257,12 +335,38 @@ export default function UsersPage() {
           </div>
         );
       case 'name':
-        return <span style={{ color: '#4b5563', fontSize: '14px' }}>{u.name || 'Gouri Customer'}</span>;
-      case 'status':
+        return <span style={{ color: '#1f2937', fontWeight: '600', fontSize: '14px' }}>{u.name || 'Account'}</span>;
+      case 'companyAddress':
         return (
-          <span className={`badge ${u.status === 'Inactive' ? 'badge-cancelled' : 'badge-dispatched'}`}>
-            {u.status || 'Active'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', maxWidth: '240px' }}>
+            <MapPin size={14} color="#9ca3af" style={{ marginTop: '3px', flexShrink: 0 }} />
+            <span style={{ fontSize: '13px', color: '#4b5563', lineHeight: '1.4' }}>
+              {u.companyAddress || u.companyName || 'N/A'}
+            </span>
+          </div>
+        );
+      case 'state':
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Globe size={14} color="#6366f1" />
+            <span style={{ fontSize: '13px', fontWeight: '500', color: '#374151' }}>{u.state || 'Maharashtra'}</span>
+          </div>
+        );
+      case 'status':
+        const isActive = u.status !== 'Inactive';
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className={`badge ${isActive ? 'badge-dispatched' : 'badge-cancelled'}`}>
+              {isActive ? 'Active' : 'Inactive'}
+            </span>
+            <button
+              onClick={() => handleToggleStatus(u)}
+              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: isActive ? '#10b981' : '#ef4444' }}
+              title={`Click to set ${isActive ? 'Inactive' : 'Active'}`}
+            >
+              {isActive ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
+            </button>
+          </div>
         );
       case 'date':
         return <span style={{ fontSize: '13px', color: '#9ca3af' }}>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}</span>;
@@ -270,17 +374,18 @@ export default function UsersPage() {
         return (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
             <button
-              onClick={() => { setEditUserObj(u); setEditPassword(''); setShowEditModal(true); }}
+              onClick={() => openEditModal(u)}
               className="btn-secondary"
               style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+              title="Edit User Credentials & Address"
             >
-              <Key size={14} /> Password
+              <Edit2 size={14} /> Edit
             </button>
             <button
               onClick={() => handleDeleteUser(u)}
               className="btn-danger"
               style={{ padding: '6px 10px' }}
-              title="Delete User"
+              title="Remove User from Admin Panel"
             >
               <Trash2 size={15} />
             </button>
@@ -322,23 +427,25 @@ export default function UsersPage() {
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div>
-            <h1 style={{ fontSize: '20px', fontWeight: '600' }}>App Users Collection ({users.length})</h1>
-            <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>Manage secure access credentials for the Mobile App.</p>
+            <h1 style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>Authorized App Users ({users.length})</h1>
+            <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>
+              Manage access credentials (User ID, Password, Account Name, Physical Address, State, Status). Synced with Couchbase Capella.
+            </p>
           </div>
         </div>
 
         <div className="glass-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
           
           {/* Action Toolbar */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '12px' }}>
             
-            <div style={{ position: 'relative', width: '280px' }}>
+            <div style={{ position: 'relative', width: '320px' }}>
               <Search size={16} color="#9ca3af" style={{ position: 'absolute', left: '12px', top: '10px' }} />
               <input
                 type="text"
                 className="glass-input"
                 style={{ paddingLeft: '36px', height: '36px' }}
-                placeholder="Search by User ID or Name..."
+                placeholder="Search User ID, Name, Address, State..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
               />
@@ -359,10 +466,10 @@ export default function UsersPage() {
                   position: 'absolute',
                   top: '44px',
                   right: '250px',
-                  width: '280px',
+                  width: '310px',
                   background: '#fff',
                   border: '1px solid var(--border-color)',
-                  borderRadius: '6px',
+                  borderRadius: '8px',
                   boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
                   zIndex: 50,
                   padding: '12px'
@@ -396,7 +503,7 @@ export default function UsersPage() {
                         </div>
                         <button
                           onClick={() => toggleColumn(col.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: col.visible ? '#1677ff' : '#9ca3af' }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: col.visible ? '#4f46e5' : '#9ca3af' }}
                         >
                           {col.visible ? <Eye size={16} /> : <EyeOff size={16} />}
                         </button>
@@ -408,19 +515,19 @@ export default function UsersPage() {
 
               <button
                 className="btn-secondary"
-                style={{ height: '36px', padding: '0 12px', color: '#52c41a', borderColor: '#b7eb8f', background: '#f6ffed' }}
+                style={{ height: '36px', padding: '0 12px', color: '#059669', borderColor: '#a7f3d0', background: '#ecfdf5' }}
                 onClick={() => setShowExcelModal(true)}
               >
                 <FileSpreadsheet size={16} style={{ marginRight: '6px', display: 'inline' }} /> Import Excel
               </button>
 
-              <button className="btn-primary" style={{ height: '36px' }} onClick={() => setShowAddModal(true)}>
-                <Plus size={16} /> Add user
+              <button className="btn-primary" style={{ height: '36px', background: '#4f46e5' }} onClick={() => setShowAddModal(true)}>
+                <Plus size={16} /> Add User
               </button>
             </div>
           </div>
 
-          {/* Dynamic Data Table */}
+          {/* Data Table */}
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
@@ -435,7 +542,7 @@ export default function UsersPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={visibleCols.length} style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>Loading users...</td>
+                    <td colSpan={visibleCols.length} style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>Loading authorized users...</td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
@@ -457,22 +564,22 @@ export default function UsersPage() {
           </div>
           
           <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', color: '#9ca3af', fontSize: '13px' }}>
-            Total {filteredUsers.length} users
+            Total {filteredUsers.length} authorized app users in Couchbase
           </div>
         </div>
       </div>
 
-      {/* Modal: Add Single User */}
+      {/* Modal: Add User */}
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '24px', color: '#1f2937' }}>
-              Create New App User
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px', borderRadius: '12px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '20px', color: '#111827' }}>
+              Add Authorized App User
             </h3>
 
-            <form onSubmit={handleAddUser} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form onSubmit={handleAddUser} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>User ID / Mobile Number *</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>User ID / Mobile Number *</label>
                 <input
                   type="text"
                   className="glass-input"
@@ -484,11 +591,11 @@ export default function UsersPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Password *</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Password *</label>
                 <input
                   type="text"
                   className="glass-input"
-                  placeholder="e.g. GGi#4321"
+                  placeholder="e.g. Pass#1234"
                   value={newPassword}
                   onChange={e => setNewPassword(e.target.value)}
                   required
@@ -496,20 +603,143 @@ export default function UsersPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Account Name / Company (Optional)</label>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Account Name</label>
                 <input
                   type="text"
                   className="glass-input"
-                  placeholder="e.g. Gouri Aqua Plast Customer"
+                  placeholder="e.g. Ramesh Hardware Store"
                   value={newName}
                   onChange={e => setNewName(e.target.value)}
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Company Physical Address</label>
+                <textarea
+                  className="glass-input"
+                  style={{ height: '70px', padding: '8px 12px' }}
+                  placeholder="e.g. Plot No 45, MIDC Industrial Area, Jalgaon"
+                  value={newCompanyAddress}
+                  onChange={e => setNewCompanyAddress(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>State</label>
+                <select
+                  className="glass-input"
+                  value={newState}
+                  onChange={e => setNewState(e.target.value)}
+                >
+                  {INDIAN_STATES.map(st => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Status - Active/Inactive</label>
+                <select
+                  className="glass-input"
+                  value={newStatus}
+                  onChange={e => setNewStatus(e.target.value)}
+                >
+                  <option value="Active">Active (Can Login & Submit Quotes)</option>
+                  <option value="Inactive">Inactive (Access Blocked)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
                 <button type="button" className="btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
-                <button type="submit" className="btn-primary" disabled={submitting}>
-                  {submitting ? 'Creating...' : 'Submit'}
+                <button type="submit" className="btn-primary" style={{ background: '#4f46e5' }} disabled={submitting}>
+                  {submitting ? 'Adding...' : 'Add & Sync Couchbase'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Edit User */}
+      {showEditModal && editUserObj && (
+        <div className="modal-overlay" onClick={() => { setShowEditModal(false); setEditUserObj(null); }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px', borderRadius: '12px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '20px', color: '#111827' }}>
+              Edit Authorized User
+            </h3>
+
+            <form onSubmit={handleEditUserSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>User ID *</label>
+                <input
+                  type="text"
+                  className="glass-input"
+                  value={editUserId}
+                  onChange={e => setEditUserId(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Password (Leave blank to keep unchanged)</label>
+                <input
+                  type="text"
+                  className="glass-input"
+                  placeholder="Enter new password to reset"
+                  value={editPassword}
+                  onChange={e => setEditPassword(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Account Name</label>
+                <input
+                  type="text"
+                  className="glass-input"
+                  value={editName}
+                  onChange={e => setEditName(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Company Physical Address</label>
+                <textarea
+                  className="glass-input"
+                  style={{ height: '70px', padding: '8px 12px' }}
+                  value={editCompanyAddress}
+                  onChange={e => setEditCompanyAddress(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>State</label>
+                <select
+                  className="glass-input"
+                  value={editState}
+                  onChange={e => setEditState(e.target.value)}
+                >
+                  {INDIAN_STATES.map(st => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Status - Active/Inactive</label>
+                <select
+                  className="glass-input"
+                  value={editStatus}
+                  onChange={e => setEditStatus(e.target.value)}
+                >
+                  <option value="Active">Active (Can Login & Submit Quotes)</option>
+                  <option value="Inactive">Inactive (Access Blocked)</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
+                <button type="button" className="btn-secondary" onClick={() => { setShowEditModal(false); setEditUserObj(null); }}>Cancel</button>
+                <button type="submit" className="btn-primary" style={{ background: '#4f46e5' }} disabled={submitting}>
+                  {submitting ? 'Saving...' : 'Save & Sync Couchbase'}
                 </button>
               </div>
             </form>
@@ -520,15 +750,15 @@ export default function UsersPage() {
       {/* Modal: Upload Excel User List */}
       {showExcelModal && (
         <div className="modal-overlay" onClick={() => { setShowExcelModal(false); setExcelRows([]); setFileName(''); }}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '24px', color: '#1f2937' }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '540px', borderRadius: '12px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px', color: '#111827' }}>
               Import Users (Excel / CSV)
             </h3>
             <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>
-              Format must contain 2 columns: <strong>Column A: User ID</strong> | <strong>Column B: Password</strong>
+              Columns: <strong>A: User ID</strong> | <strong>B: Password</strong> | <strong>C: Account Name</strong> | <strong>D: Physical Address</strong> | <strong>E: State</strong> | <strong>F: Status (Active/Inactive)</strong>
             </p>
 
-            <div style={{ border: '1px dashed #d9d9d9', borderRadius: '6px', padding: '24px', textAlign: 'center', background: '#fafafa', marginBottom: '20px' }}>
+            <div style={{ border: '1px dashed #d9d9d9', borderRadius: '8px', padding: '24px', textAlign: 'center', background: '#fafafa', marginBottom: '20px' }}>
               <Upload size={32} color="#9ca3af" style={{ marginBottom: '12px' }} />
               <p style={{ fontSize: '14px', color: '#1f2937', marginBottom: '12px', fontWeight: '500' }}>
                 {fileName ? `Selected: ${fileName}` : 'Choose Excel File (.xlsx, .csv)'}
@@ -544,12 +774,16 @@ export default function UsersPage() {
                 <h4 style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', fontWeight: '600' }}>
                   Preview ({excelRows.length} rows)
                 </h4>
-                <div style={{ maxHeight: '160px', overflowY: 'auto', background: '#f5f5f5', borderRadius: '4px', padding: '8px', border: '1px solid #f0f0f0' }}>
+                <div style={{ maxHeight: '160px', overflowY: 'auto', background: '#f5f5f5', borderRadius: '6px', padding: '8px', border: '1px solid #f0f0f0' }}>
                   <table style={{ width: '100%', fontSize: '12px', textAlign: 'left' }}>
                     <thead>
                       <tr>
                         <th style={{ padding: '4px' }}>User ID</th>
                         <th style={{ padding: '4px' }}>Password</th>
+                        <th style={{ padding: '4px' }}>Account Name</th>
+                        <th style={{ padding: '4px' }}>Address</th>
+                        <th style={{ padding: '4px' }}>State</th>
+                        <th style={{ padding: '4px' }}>Status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -557,6 +791,10 @@ export default function UsersPage() {
                         <tr key={idx}>
                           <td style={{ padding: '4px' }}>{row.userId}</td>
                           <td style={{ padding: '4px', color: '#6b7280' }}>{row.password}</td>
+                          <td style={{ padding: '4px' }}>{row.name || '-'}</td>
+                          <td style={{ padding: '4px' }}>{row.companyAddress || '-'}</td>
+                          <td style={{ padding: '4px' }}>{row.state || '-'}</td>
+                          <td style={{ padding: '4px' }}>{row.status}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -568,45 +806,10 @@ export default function UsersPage() {
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
               <button type="button" className="btn-secondary" onClick={() => { setShowExcelModal(false); setExcelRows([]); setFileName(''); }}>Cancel</button>
-              <button type="button" className="btn-primary" onClick={handleExcelUpload} disabled={uploading || excelRows.length === 0}>
-                {uploading ? 'Importing...' : `Import ${excelRows.length} Users`}
+              <button type="button" className="btn-primary" style={{ background: '#4f46e5' }} onClick={handleExcelUpload} disabled={uploading || excelRows.length === 0}>
+                {uploading ? 'Importing...' : `Import ${excelRows.length} Users & Sync`}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal: Edit User Password */}
-      {showEditModal && editUserObj && (
-        <div className="modal-overlay" onClick={() => { setShowEditModal(false); setEditUserObj(null); }}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: '#1f2937' }}>
-              Change Password
-            </h3>
-            <p style={{ fontSize: '13px', color: '#1677ff', marginBottom: '24px', fontWeight: '500' }}>
-              User ID: {editUserObj.userId || editUserObj.mobile}
-            </p>
-
-            <form onSubmit={handleEditPasswordSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>New Password *</label>
-                <input
-                  type="text"
-                  className="glass-input"
-                  placeholder="Enter new password"
-                  value={editPassword}
-                  onChange={e => setEditPassword(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
-                <button type="button" className="btn-secondary" onClick={() => { setShowEditModal(false); setEditUserObj(null); }}>Cancel</button>
-                <button type="submit" className="btn-primary" disabled={submitting}>
-                  {submitting ? 'Updating...' : 'Save'}
-                </button>
-              </div>
-            </form>
           </div>
         </div>
       )}
