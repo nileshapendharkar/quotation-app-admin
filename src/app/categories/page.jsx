@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Navbar from '@/components/Navbar';
-import { Plus, Edit, Trash2, Layers } from 'lucide-react';
+import { Plus, Edit, Trash2 } from 'lucide-react';
 import { apiFetch, getImageUrl } from '@/lib/api';
 
 export default function CategoriesPage() {
@@ -31,7 +31,7 @@ export default function CategoriesPage() {
   const openAddModal = () => {
     setEditingCategory(null);
     setFormName('');
-    setFormImage('https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=400&q=80');
+    setFormImage('');
     setFormDesc('');
     setIsModalOpen(true);
   };
@@ -49,9 +49,12 @@ export default function CategoriesPage() {
     if (!formName) return;
     setSubmitting(true);
 
-    const payload = { name: formName, image: formImage, description: formDesc };
+    const payload = { 
+      name: formName, 
+      image: formImage || 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=400&q=80', 
+      description: formDesc 
+    };
 
-    // --- OPTIMISTIC UI UPDATE ---
     const previousCategories = [...categories];
     if (editingCategory) {
       setCategories(categories.map(c => c.id === editingCategory.id ? { ...c, ...payload } : c));
@@ -59,7 +62,7 @@ export default function CategoriesPage() {
       const tempCategory = { id: 'temp_' + Date.now(), ...payload };
       setCategories([tempCategory, ...categories]);
     }
-    setIsModalOpen(false); // Close instantly
+    setIsModalOpen(false);
 
     let res;
     if (editingCategory) {
@@ -77,10 +80,8 @@ export default function CategoriesPage() {
     setSubmitting(false);
 
     if (res.success) {
-      // Sync real data silently
       fetchCategories(false);
     } else {
-      // --- ROLLBACK ---
       alert(res.message || 'Operation failed. Rolling back changes...');
       setCategories(previousCategories);
       setIsModalOpen(true);
@@ -90,16 +91,14 @@ export default function CategoriesPage() {
   const handleDelete = async (id) => {
     if (!confirm('Are you sure you want to delete this category?')) return;
     
-    // --- OPTIMISTIC UI UPDATE ---
     const previousCategories = [...categories];
     setCategories(categories.filter(c => c.id !== id));
 
     const res = await apiFetch(`/categories/${id}`, { method: 'DELETE' });
     
     if (res.success) {
-      fetchCategories(false); // Silently sync
+      fetchCategories(false);
     } else {
-      // --- ROLLBACK ---
       alert(res.message || 'Delete failed. Rolling back changes...');
       setCategories(previousCategories);
     }
@@ -109,49 +108,86 @@ export default function CategoriesPage() {
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--bg-body)' }}>
       <Sidebar />
       <Navbar />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '24px' }}>
 
-        <main style={{ padding: '32px', flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '800', color: '#f8fafc' }}>Categories List</h2>
-            <button className="btn-primary" onClick={openAddModal}>
-              <Plus size={18} /> Add Category
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h1 style={{ fontSize: '20px', fontWeight: '600' }}>Categories Management</h1>
+        </div>
+
+        <div className="glass-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', padding: '16px 24px', borderBottom: '1px solid var(--border-color)' }}>
+            <button className="btn-primary" style={{ height: '36px' }} onClick={openAddModal}>
+              <Plus size={16} /> Add new category
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '20px' }}>
-            {categories.map(cat => (
-              <div key={cat.id} className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ height: '140px', borderRadius: '12px', overflow: 'hidden', marginBottom: '16px' }}>
-                  <img src={getImageUrl(cat.image)} alt={cat.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                </div>
-                <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#f8fafc', marginBottom: '6px' }}>{cat.name}</h4>
-                <p style={{ fontSize: '13px', color: '#94a3b8', flex: 1, marginBottom: '16px' }}>{cat.description || 'No description'}</p>
-
-                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', borderTop: '1px solid var(--border-glass)', paddingTop: '12px' }}>
-                  <button onClick={() => openEditModal(cat)} className="btn-secondary" style={{ padding: '6px 12px' }}>
-                    <Edit size={14} />
-                  </button>
-                  <button onClick={() => handleDelete(cat.id)} className="btn-danger">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ width: '80px', padding: '12px 24px' }}>Image</th>
+                  <th>Category Name</th>
+                  <th>Description</th>
+                  <th style={{ width: '160px', textAlign: 'center' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan="4" style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>Loading categories...</td>
+                  </tr>
+                ) : categories.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>No categories found.</td>
+                  </tr>
+                ) : (
+                  categories.map(cat => (
+                    <tr key={cat.id}>
+                      <td style={{ padding: '12px 24px' }}>
+                        <div style={{ width: '48px', height: '48px', borderRadius: '6px', background: '#f5f5f5', overflow: 'hidden' }}>
+                          <img src={getImageUrl(cat.image)} alt={cat.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: '500', color: '#1f2937', fontSize: '15px' }}>{cat.name}</div>
+                      </td>
+                      <td style={{ color: '#6b7280' }}>
+                        {cat.description || '-'}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+                          <button onClick={() => openEditModal(cat)} style={{ background: 'none', border: 'none', color: '#1677ff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Edit size={14} /> Edit
+                          </button>
+                          <button onClick={() => handleDelete(cat.id)} style={{ background: 'none', border: 'none', color: '#ff4d4f', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Trash2 size={14} /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        </main>
+          
+          <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', color: '#9ca3af', fontSize: '13px' }}>
+            Total {categories.length} categories
+          </div>
+        </div>
       </div>
 
       {isModalOpen && (
         <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '20px', color: '#f8fafc' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '24px', color: '#1f2937' }}>
               {editingCategory ? 'Edit Category' : 'Add New Category'}
             </h3>
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Category Name</label>
+                <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Category Name</label>
                 <input
                   type="text"
                   className="glass-input"
@@ -163,7 +199,12 @@ export default function CategoriesPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Image URL</label>
+                <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Image URL</label>
+                {formImage && (
+                  <div style={{ width: '100%', height: '120px', borderRadius: '6px', overflow: 'hidden', marginBottom: '10px', border: '1px solid #d9d9d9' }}>
+                    <img src={getImageUrl(formImage)} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#fafafa' }} />
+                  </div>
+                )}
                 <input
                   type="url"
                   className="glass-input"
@@ -174,7 +215,7 @@ export default function CategoriesPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Description</label>
+                <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Description</label>
                 <textarea
                   className="glass-input"
                   rows={3}
@@ -183,10 +224,10 @@ export default function CategoriesPage() {
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
                 <button type="button" className="btn-secondary" onClick={() => setIsModalOpen(false)}>Cancel</button>
                 <button type="submit" className="btn-primary" disabled={submitting}>
-                  {submitting ? 'Saving...' : 'Save Category'}
+                  {submitting ? 'Saving...' : 'Submit'}
                 </button>
               </div>
             </form>

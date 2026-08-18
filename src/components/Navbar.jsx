@@ -58,7 +58,7 @@ export default function Navbar() {
             G
           </div>
           <span style={{ fontSize: '16px', fontWeight: '600', color: '#fff', letterSpacing: '0.5px' }}>
-            NocoBase Admin
+            Admin Dashboard
           </span>
         </div>
 

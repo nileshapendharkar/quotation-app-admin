@@ -100,45 +100,43 @@ export default function OrdersPage() {
                 <tbody>
                   {orders.map(order => (
                     <tr key={order.id}>
-                      <td style={{ fontWeight: '700', color: '#38bdf8' }}>{order.orderNo}</td>
+                      <td style={{ fontWeight: '500', color: '#1677ff' }}>{order.orderNo}</td>
                       <td>
-                        <div style={{ fontWeight: '700', color: '#f8fafc' }}>{order.userName}</div>
-                        <div style={{ fontSize: '12px', color: '#94a3b8' }}>{order.userEmail} | {order.userMobile}</div>
-                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>{order.companyName}</div>
+                        <div style={{ fontWeight: '500', color: '#1f2937' }}>{order.userName}</div>
+                        <div style={{ fontSize: '12px', color: '#6b7280' }}>{order.userEmail} | {order.userMobile}</div>
+                        <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>{order.companyName}</div>
                       </td>
                       <td>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                           {order.items.map((item, i) => (
-                            <div key={i} style={{ fontSize: '13px', background: 'rgba(255,255,255,0.03)', padding: '6px 10px', borderRadius: '6px' }}>
+                            <div key={i} style={{ fontSize: '13px', background: '#fafafa', border: '1px solid #f0f0f0', padding: '4px 8px', borderRadius: '4px' }}>
                               <strong>{item.productName}{item.size ? ` (Size: ${item.size})` : ''}</strong>
-                              <span style={{ color: '#38bdf8', fontWeight: '700', marginLeft: '8px' }}>
-                                × {item.quantity} Units
+                              <span style={{ color: '#1677ff', fontWeight: '600', marginLeft: '8px' }}>
+                                × {item.quantity}
                               </span>
                             </div>
                           ))}
                         </div>
                       </td>
-                      <td style={{ fontSize: '13px', color: '#94a3b8' }}>
+                      <td style={{ fontSize: '13px', color: '#6b7280' }}>
                         {new Date(order.createdAt).toLocaleDateString()}
                       </td>
                       <td>
                         <select
                           value={order.status}
                           onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                          className={`badge badge-${order.status.toLowerCase()}`}
                           style={{
-                            padding: '6px 12px',
-                            borderRadius: '8px',
-                            background: order.status === 'Pending' ? 'rgba(245, 158, 11, 0.2)' : order.status === 'Dispatched' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(239, 68, 68, 0.2)',
-                            color: order.status === 'Pending' ? '#f59e0b' : order.status === 'Dispatched' ? '#10b981' : '#ef4444',
-                            border: '1px solid var(--border-glass)',
-                            fontWeight: '700',
+                            padding: '4px 8px',
+                            fontWeight: '600',
                             fontSize: '12px',
-                            outline: 'none'
+                            outline: 'none',
+                            cursor: 'pointer'
                           }}
                         >
-                          <option value="Pending" style={{ background: '#0f172a', color: '#f59e0b' }}>Pending</option>
-                          <option value="Dispatched" style={{ background: '#0f172a', color: '#10b981' }}>Dispatched</option>
-                          <option value="Cancelled" style={{ background: '#0f172a', color: '#ef4444' }}>Cancelled</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Dispatched">Dispatched</option>
+                          <option value="Cancelled">Cancelled</option>
                         </select>
                       </td>
                       <td>

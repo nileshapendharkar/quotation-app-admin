@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import Navbar from '@/components/Navbar';
-import { Plus, Search, Edit, Trash2, Package, Image as ImageIcon, Check } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Filter } from 'lucide-react';
 import { apiFetch, getImageUrl } from '@/lib/api';
 
 export default function ProductsPage() {
@@ -48,7 +48,7 @@ export default function ProductsPage() {
   const openAddModal = () => {
     setEditingProduct(null);
     setFormName('');
-    setFormImage('https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=500&q=80');
+    setFormImage('');
     setFormCategory(categories[0]?.id || '');
     setFormDesc('');
     setFormDetails('');
@@ -76,28 +76,24 @@ export default function ProductsPage() {
 
     const payload = {
       name: formName,
-      image: formImage,
+      image: formImage || 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=500&q=80',
       categoryId: formCategory,
       description: formDesc,
       details: formDetails,
       specification: formSpecification,
       sizes: formSizes.split(',').map(s => s.trim()).filter(Boolean)
-      // STRICTLY NO PRICE FIELD!
     };
 
-    // --- OPTIMISTIC UI UPDATE ---
     const previousProducts = [...products];
     const catName = categories.find(c => c.id === formCategory)?.name || 'General';
     
     if (editingProduct) {
-      // Optimistic Edit
       setProducts(products.map(p => p.id === editingProduct.id ? { ...p, ...payload, categoryName: catName } : p));
     } else {
-      // Optimistic Add
       const tempProduct = { id: 'temp_' + Date.now(), ...payload, categoryName: catName };
       setProducts([tempProduct, ...products]);
     }
-    setIsModalOpen(false); // Close instantly
+    setIsModalOpen(false);
 
     let res;
     if (editingProduct) {
@@ -115,10 +111,8 @@ export default function ProductsPage() {
     setSubmitting(false);
 
     if (res.success) {
-      // Sync real data silently (to replace temporary IDs and sync server state)
       fetchProducts(false);
     } else {
-      // --- ROLLBACK ---
       alert(res.message || 'Operation failed. Rolling back changes...');
       setProducts(previousProducts);
       setIsModalOpen(true);
@@ -128,16 +122,14 @@ export default function ProductsPage() {
   const handleDelete = async (id) => {
     if (!confirm('Are you sure you want to delete this product?')) return;
     
-    // --- OPTIMISTIC UI UPDATE ---
     const previousProducts = [...products];
     setProducts(products.filter(p => p.id !== id));
 
     const res = await apiFetch(`/products/${id}`, { method: 'DELETE' });
     
     if (res.success) {
-      fetchProducts(false); // Silently sync
+      fetchProducts(false);
     } else {
-      // --- ROLLBACK ---
       alert(res.message || 'Delete failed. Rolling back changes...');
       setProducts(previousProducts);
     }
@@ -147,19 +139,24 @@ export default function ProductsPage() {
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--bg-body)' }}>
       <Sidebar />
       <Navbar />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '24px' }}>
 
-        <main style={{ padding: '32px', flex: 1 }}>
-          {/* Action Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <div style={{ position: 'relative', width: '280px' }}>
-                <Search size={18} color="#64748b" style={{ position: 'absolute', left: '14px', top: '12px' }} />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h1 style={{ fontSize: '20px', fontWeight: '600' }}>Products Collection</h1>
+        </div>
+
+        <div className="glass-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          
+          {/* Action Toolbar */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+              <div style={{ position: 'relative', width: '260px' }}>
+                <Search size={16} color="#9ca3af" style={{ position: 'absolute', left: '12px', top: '10px' }} />
                 <input
                   type="text"
                   className="glass-input"
-                  style={{ paddingLeft: '40px' }}
-                  placeholder="Search products..."
+                  style={{ paddingLeft: '36px', height: '36px' }}
+                  placeholder="Filter products..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && fetchProducts()}
@@ -168,109 +165,114 @@ export default function ProductsPage() {
 
               <select
                 className="glass-input"
-                style={{ width: '200px' }}
+                style={{ width: '180px', height: '36px' }}
                 value={selectedCategory}
-                onChange={(e) => {
-                  setSelectedCategory(e.target.value);
-                }}
+                onChange={(e) => setSelectedCategory(e.target.value)}
               >
-                <option value="" style={{ background: '#0f172a' }}>All Categories</option>
+                <option value="">All Categories</option>
                 {categories.map(c => (
-                  <option key={c.id} value={c.id} style={{ background: '#0f172a' }}>{c.name}</option>
+                  <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
 
-              <button className="btn-secondary" onClick={fetchProducts}>Filter</button>
+              <button className="btn-secondary" style={{ height: '36px', padding: '0 12px' }} onClick={fetchProducts}>
+                <Filter size={16} style={{ marginRight: '6px', display: 'inline' }} /> Filter
+              </button>
             </div>
 
-            <button className="btn-primary" onClick={openAddModal}>
-              <Plus size={18} /> Add Product
+            <button className="btn-primary" style={{ height: '36px' }} onClick={openAddModal}>
+              <Plus size={16} /> Add new
             </button>
           </div>
 
-          {/* Product Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-            {products.map(product => (
-              <div key={product.id} className="glass-card" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ height: '180px', position: 'relative', background: '#000' }}>
-                  <img
-                    src={getImageUrl(product.image)}
-                    alt={product.name}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                  <div style={{
-                    position: 'absolute',
-                    top: '12px',
-                    left: '12px',
-                    padding: '4px 10px',
-                    borderRadius: '20px',
-                    background: 'rgba(15, 23, 42, 0.8)',
-                    backdropFilter: 'blur(8px)',
-                    fontSize: '11px',
-                    fontWeight: '700',
-                    color: '#38bdf8'
-                  }}>
-                    {product.categoryName}
-                  </div>
-                </div>
-
-                <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#f8fafc', marginBottom: '8px' }}>
-                    {product.name}
-                  </h4>
-                  <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '12px', flex: 1 }}>
-                    {product.description || 'No description provided.'}
-                  </p>
-
-                  {product.sizes && product.sizes.length > 0 && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
-                      {product.sizes.map((s, idx) => (
-                        <span key={idx} style={{
-                          fontSize: '11px',
-                          background: 'rgba(56, 189, 248, 0.08)',
-                          border: '1px solid rgba(56, 189, 248, 0.15)',
-                          padding: '2px 8px',
-                          borderRadius: '4px',
-                          color: '#38bdf8'
-                        }}>
-                          {s}
+          {/* Data Table */}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={{ width: '60px', padding: '12px 24px' }}>Image</th>
+                  <th>Product Name</th>
+                  <th>Category</th>
+                  <th>Sizes</th>
+                  <th style={{ width: '140px', textAlign: 'center' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>Loading products...</td>
+                  </tr>
+                ) : products.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>No products found.</td>
+                  </tr>
+                ) : (
+                  products.map(product => (
+                    <tr key={product.id}>
+                      <td style={{ padding: '12px 24px' }}>
+                        <div style={{ width: '40px', height: '40px', borderRadius: '6px', background: '#f5f5f5', overflow: 'hidden' }}>
+                          <img
+                            src={getImageUrl(product.image)}
+                            alt={product.name}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </div>
+                      </td>
+                      <td>
+                        <div style={{ fontWeight: '500', color: '#1f2937' }}>{product.name}</div>
+                        <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>{product.description || 'No description'}</div>
+                      </td>
+                      <td>
+                        <span className="badge badge-dispatched" style={{ backgroundColor: '#e6f4ff', color: '#1677ff', borderColor: '#91caff' }}>
+                          {product.categoryName}
                         </span>
-                      ))}
-                    </div>
-                  )}
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: '12px', borderTop: '1px solid var(--border-glass)' }}>
-                    <span style={{ fontSize: '12px', color: '#10b981', fontWeight: '700' }}>
-                      ✓ Quotation Ready
-                    </span>
-
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button onClick={() => openEditModal(product)} className="btn-secondary" style={{ padding: '6px 12px' }}>
-                        <Edit size={14} />
-                      </button>
-                      <button onClick={() => handleDelete(product.id)} className="btn-danger">
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+                      </td>
+                      <td>
+                        {product.sizes && product.sizes.length > 0 ? (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                            {product.sizes.map((s, idx) => (
+                              <span key={idx} className="badge" style={{ background: '#f5f5f5', border: '1px solid #d9d9d9', color: '#595959' }}>{s}</span>
+                            ))}
+                          </div>
+                        ) : (
+                          <span style={{ color: '#9ca3af', fontSize: '12px' }}>-</span>
+                        )}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+                          <button onClick={() => openEditModal(product)} style={{ background: 'none', border: 'none', color: '#1677ff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Edit size={14} /> Edit
+                          </button>
+                          <button onClick={() => handleDelete(product.id)} style={{ background: 'none', border: 'none', color: '#ff4d4f', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Trash2 size={14} /> Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
-        </main>
+          
+          <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', color: '#9ca3af', fontSize: '13px' }}>
+            Total {products.length} items
+          </div>
+        </div>
+
       </div>
 
-      {/* Add / Edit Product Modal */}
+      {/* Add / Edit Form Modal */}
       {isModalOpen && (
         <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '20px', color: '#f8fafc' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '24px', color: '#1f2937' }}>
               {editingProduct ? 'Edit Product' : 'Add New Product'}
             </h3>
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Product Name</label>
+                <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Product Name</label>
                 <input
                   type="text"
                   className="glass-input"
@@ -282,91 +284,73 @@ export default function ProductsPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Category</label>
+                <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Category</label>
                 <select
                   className="glass-input"
                   value={formCategory}
                   onChange={(e) => setFormCategory(e.target.value)}
                   required
                 >
-                  <option value="" style={{ background: '#0f172a' }}>Select Category</option>
+                  <option value="">Select Category</option>
                   {categories.map(c => (
-                    <option key={c.id} value={c.id} style={{ background: '#0f172a' }}>{c.name}</option>
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Product Image</label>
-                
-                {/* Image Preview Box */}
+                <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Product Image</label>
                 {formImage ? (
-                  <div style={{ position: 'relative', width: '100%', height: '140px', borderRadius: '10px', overflow: 'hidden', marginBottom: '10px', background: '#0f172a', border: '1px solid var(--border-glass)' }}>
-                    <img src={getImageUrl(formImage)} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <div style={{ position: 'relative', width: '100%', height: '140px', borderRadius: '6px', overflow: 'hidden', marginBottom: '10px', border: '1px solid #d9d9d9' }}>
+                    <img src={getImageUrl(formImage)} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#fafafa' }} />
                     <button
                       type="button"
                       onClick={() => setFormImage('')}
-                      style={{ position: 'absolute', top: '8px', right: '8px', background: 'rgba(239, 68, 68, 0.8)', color: '#fff', border: 'none', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold' }}
+                      style={{ position: 'absolute', top: '8px', right: '8px', background: '#ff4d4f', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', fontSize: '12px' }}
                     >
-                      ×
+                      Clear
                     </button>
                   </div>
                 ) : null}
-
                 <div style={{ display: 'flex', gap: '10px', flexDirection: 'column' }}>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="glass-input"
-                    onChange={(e) => {
-                      const file = e.target.files[0];
-                      if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setFormImage(reader.result);
-                        };
-                        reader.readAsDataURL(file);
-                      }
-                    }}
-                  />
-                  <div style={{ fontSize: '11px', color: '#64748b', textAlign: 'center' }}>- OR enter Image URL below -</div>
                   <input
                     type="url"
                     className="glass-input"
-                    placeholder="https://images.unsplash.com/..."
+                    placeholder="Image URL (e.g., https://images.unsplash.com/...)"
                     value={formImage}
                     onChange={(e) => setFormImage(e.target.value)}
                   />
                 </div>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Description (Optional)</label>
-                <textarea
-                  className="glass-input"
-                  rows={3}
-                  placeholder="Product description..."
-                  value={formDesc}
-                  onChange={(e) => setFormDesc(e.target.value)}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Description</label>
+                  <textarea
+                    className="glass-input"
+                    rows={2}
+                    placeholder="Short description..."
+                    value={formDesc}
+                    onChange={(e) => setFormDesc(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Details</label>
+                  <textarea
+                    className="glass-input"
+                    rows={2}
+                    placeholder="Extended details..."
+                    value={formDetails}
+                    onChange={(e) => setFormDetails(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Details (Optional)</label>
+                <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Specification</label>
                 <textarea
                   className="glass-input"
-                  rows={3}
-                  placeholder="Product details..."
-                  value={formDetails}
-                  onChange={(e) => setFormDetails(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Specification (Optional)</label>
-                <textarea
-                  className="glass-input"
-                  rows={3}
+                  rows={2}
                   placeholder="Product specifications..."
                   value={formSpecification}
                   onChange={(e) => setFormSpecification(e.target.value)}
@@ -374,24 +358,20 @@ export default function ProductsPage() {
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Sizes (Comma-separated, optional)</label>
+                <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Sizes (Comma-separated)</label>
                 <input
                   type="text"
                   className="glass-input"
-                  placeholder="e.g. 500L, 1000L, 2000L or 1/2 inch, 1 inch"
+                  placeholder="e.g. 1/2 inch, 3/4 inch, 1 inch"
                   value={formSizes}
                   onChange={(e) => setFormSizes(e.target.value)}
                 />
               </div>
 
-              <div style={{ padding: '10px', borderRadius: '8px', background: 'rgba(56, 189, 248, 0.1)', fontSize: '12px', color: '#38bdf8', textAlign: 'center' }}>
-                ✓ Zero Pricing Policy: Product Name + Product Image + Quantity only.
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
                 <button type="button" className="btn-secondary" onClick={() => setIsModalOpen(false)}>Cancel</button>
                 <button type="submit" className="btn-primary" disabled={submitting}>
-                  {submitting ? 'Saving...' : 'Save Product'}
+                  {submitting ? 'Saving...' : 'Submit'}
                 </button>
               </div>
             </form>

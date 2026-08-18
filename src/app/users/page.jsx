@@ -236,10 +236,10 @@ export default function UsersPage() {
             marginBottom: '28px'
           }}>
             <div>
-              <h2 style={{ fontSize: '22px', fontWeight: '800', margin: 0, color: '#f8fafc' }}>
+              <h2 style={{ fontSize: '22px', fontWeight: '600', margin: 0, color: '#1f2937' }}>
                 Authorized App Users ({users.length})
               </h2>
-              <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px', margin: 0 }}>
+              <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px', margin: 0 }}>
                 Strict Mobile App Login: Only User ID & Password credentials managed here are allowed to log in.
               </p>
             </div>
@@ -280,7 +280,7 @@ export default function UsersPage() {
                 background: 'transparent',
                 border: 'none',
                 outline: 'none',
-                color: '#f8fafc',
+                color: '#1f2937',
                 fontSize: '14px',
                 width: '100%'
               }}
@@ -298,13 +298,13 @@ export default function UsersPage() {
             ) : (
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)', textAlign: 'left' }}>
-                    <th style={{ padding: '12px 16px', color: '#38bdf8', fontSize: '13px' }}>User ID / Mobile</th>
-                    <th style={{ padding: '12px 16px', color: '#38bdf8', fontSize: '13px' }}>Password</th>
-                    <th style={{ padding: '12px 16px', color: '#38bdf8', fontSize: '13px' }}>Account Name</th>
-                    <th style={{ padding: '12px 16px', color: '#38bdf8', fontSize: '13px' }}>Status</th>
-                    <th style={{ padding: '12px 16px', color: '#38bdf8', fontSize: '13px' }}>Created Date</th>
-                    <th style={{ padding: '12px 16px', color: '#38bdf8', fontSize: '13px', textAlign: 'center' }}>Actions</th>
+                  <tr style={{ borderBottom: '1px solid #f0f0f0', textAlign: 'left', background: '#fafafa' }}>
+                    <th style={{ padding: '12px 16px', color: '#1f2937', fontSize: '13px', fontWeight: '600' }}>User ID / Mobile</th>
+                    <th style={{ padding: '12px 16px', color: '#1f2937', fontSize: '13px', fontWeight: '600' }}>Password</th>
+                    <th style={{ padding: '12px 16px', color: '#1f2937', fontSize: '13px', fontWeight: '600' }}>Account Name</th>
+                    <th style={{ padding: '12px 16px', color: '#1f2937', fontSize: '13px', fontWeight: '600' }}>Status</th>
+                    <th style={{ padding: '12px 16px', color: '#1f2937', fontSize: '13px', fontWeight: '600' }}>Created Date</th>
+                    <th style={{ padding: '12px 16px', color: '#1f2937', fontSize: '13px', fontWeight: '600', textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -313,10 +313,10 @@ export default function UsersPage() {
                     const displayPass = u.plainPassword || '••••••••';
 
                     return (
-                      <tr key={u.id} style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                        <td style={{ padding: '14px 16px', fontWeight: '800', color: '#f8fafc', fontSize: '15px' }}>
+                      <tr key={u.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                        <td style={{ padding: '14px 16px', fontWeight: '600', color: '#1677ff', fontSize: '14px' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Phone size={15} color="#38bdf8" />
+                            <Phone size={15} color="#1677ff" />
                             {u.userId || u.mobile}
                           </div>
                         </td>
@@ -327,7 +327,7 @@ export default function UsersPage() {
                               fontFamily: isVisible ? 'monospace' : 'inherit',
                               fontSize: isVisible ? '14px' : '16px',
                               letterSpacing: isVisible ? '0' : '2px',
-                              color: isVisible ? '#34d399' : '#cbd5e1'
+                              color: isVisible ? '#52c41a' : '#6b7280'
                             }}>
                               {isVisible ? (u.plainPassword || '(Hashed)') : '••••••••'}
                             </span>
@@ -348,7 +348,7 @@ export default function UsersPage() {
                           </div>
                         </td>
 
-                        <td style={{ padding: '14px 16px', color: '#e2e8f0', fontSize: '14px' }}>
+                        <td style={{ padding: '14px 16px', color: '#4b5563', fontSize: '14px' }}>
                           {u.name || 'Gouri Customer'}
                         </td>
 
