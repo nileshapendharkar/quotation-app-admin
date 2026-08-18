@@ -35,6 +35,7 @@ export default function ProductsPage() {
   const [formDetails, setFormDetails] = useState('');
   const [formSpecification, setFormSpecification] = useState('');
   const [formSizes, setFormSizes] = useState('');
+  const [formPackSizes, setFormPackSizes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -77,6 +78,7 @@ export default function ProductsPage() {
     setFormDetails('');
     setFormSpecification('');
     setFormSizes('');
+    setFormPackSizes('');
     setIsModalOpen(true);
   };
 
@@ -89,6 +91,16 @@ export default function ProductsPage() {
     setFormDetails(prod.details || '');
     setFormSpecification(prod.specification || '');
     setFormSizes(prod.sizes ? prod.sizes.join(', ') : '');
+    
+    // Parse packSizes object to string
+    let psStr = '';
+    if (prod.packSizes) {
+      psStr = Object.entries(prod.packSizes).map(([k, v]) => `${k}:${v}`).join(', ');
+    } else if (prod.packSize) {
+      psStr = `All:${prod.packSize}`;
+    }
+    setFormPackSizes(psStr);
+    
     setIsModalOpen(true);
   };
 
@@ -97,6 +109,16 @@ export default function ProductsPage() {
     if (!formName || !formCategory) return;
     setSubmitting(true);
 
+    // Parse Pack Sizes string back to object
+    let parsedPackSizes = null;
+    if (formPackSizes) {
+      parsedPackSizes = {};
+      formPackSizes.split(',').forEach(pair => {
+        const [k, v] = pair.split(':').map(s => s.trim());
+        if (k && v) parsedPackSizes[k] = parseInt(v) || v;
+      });
+    }
+
     const payload = {
       name: formName,
       image: formImage || 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=500&q=80',
@@ -104,7 +126,8 @@ export default function ProductsPage() {
       description: formDesc,
       details: formDetails,
       specification: formSpecification,
-      sizes: formSizes.split(',').map(s => s.trim()).filter(Boolean)
+      sizes: formSizes.split(',').map(s => s.trim()).filter(Boolean),
+      ...(parsedPackSizes && Object.keys(parsedPackSizes).length > 0 ? { packSizes: parsedPackSizes } : {})
     };
 
     const previousProducts = [...products];
@@ -489,15 +512,27 @@ export default function ProductsPage() {
                 />
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Sizes (Comma-separated)</label>
-                <input
-                  type="text"
-                  className="glass-input"
-                  placeholder="e.g. 1/2 inch, 3/4 inch, 1 inch"
-                  value={formSizes}
-                  onChange={(e) => setFormSizes(e.target.value)}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Sizes (Comma-separated)</label>
+                  <input
+                    type="text"
+                    className="glass-input"
+                    placeholder="e.g. 1/2 inch, 3/4 inch, 1 inch"
+                    value={formSizes}
+                    onChange={(e) => setFormSizes(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Pack Sizes (Size:Qty)</label>
+                  <input
+                    type="text"
+                    className="glass-input"
+                    placeholder="e.g. 1/2:24, 3/4:24"
+                    value={formPackSizes}
+                    onChange={(e) => setFormPackSizes(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '24px' }}>
