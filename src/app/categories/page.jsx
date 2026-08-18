@@ -21,11 +21,11 @@ export default function CategoriesPage() {
     fetchCategories();
   }, []);
 
-  const fetchCategories = async () => {
-    setLoading(true);
+  const fetchCategories = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     const res = await apiFetch('/categories');
     if (res.success) setCategories(res.categories || []);
-    setLoading(false);
+    if (showLoading) setLoading(false);
   };
 
   const openAddModal = () => {
@@ -51,6 +51,16 @@ export default function CategoriesPage() {
 
     const payload = { name: formName, image: formImage, description: formDesc };
 
+    // --- OPTIMISTIC UI UPDATE ---
+    const previousCategories = [...categories];
+    if (editingCategory) {
+      setCategories(categories.map(c => c.id === editingCategory.id ? { ...c, ...payload } : c));
+    } else {
+      const tempCategory = { id: 'temp_' + Date.now(), ...payload };
+      setCategories([tempCategory, ...categories]);
+    }
+    setIsModalOpen(false); // Close instantly
+
     let res;
     if (editingCategory) {
       res = await apiFetch(`/categories/${editingCategory.id}`, {
@@ -67,18 +77,31 @@ export default function CategoriesPage() {
     setSubmitting(false);
 
     if (res.success) {
-      setIsModalOpen(false);
-      fetchCategories();
+      // Sync real data silently
+      fetchCategories(false);
     } else {
-      alert(res.message || 'Operation failed');
+      // --- ROLLBACK ---
+      alert(res.message || 'Operation failed. Rolling back changes...');
+      setCategories(previousCategories);
+      setIsModalOpen(true);
     }
   };
 
   const handleDelete = async (id) => {
     if (!confirm('Are you sure you want to delete this category?')) return;
+    
+    // --- OPTIMISTIC UI UPDATE ---
+    const previousCategories = [...categories];
+    setCategories(categories.filter(c => c.id !== id));
+
     const res = await apiFetch(`/categories/${id}`, { method: 'DELETE' });
+    
     if (res.success) {
-      fetchCategories();
+      fetchCategories(false); // Silently sync
+    } else {
+      // --- ROLLBACK ---
+      alert(res.message || 'Delete failed. Rolling back changes...');
+      setCategories(previousCategories);
     }
   };
 

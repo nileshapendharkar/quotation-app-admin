@@ -1,3 +1,5 @@
+import { apiCircuitBreaker } from './CircuitBreaker';
+
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://quotation-app-backend.onrender.com/api';
 
 export const getImageUrl = (path) => {
@@ -24,12 +26,18 @@ export async function apiFetch(endpoint, options = {}) {
     headers,
   };
 
-  try {
-    const res = await fetch(`${API_BASE}${endpoint}`, config);
-    const data = await res.json();
-    return data;
-  } catch (err) {
-    console.error(`API Fetch Error [${endpoint}]:`, err);
-    return { success: false, message: 'Server connection failed' };
-  }
+  const action = async (signal) => {
+    const res = await fetch(`${API_BASE}${endpoint}`, { ...config, signal });
+    if (!res.ok) {
+      throw new Error(`HTTP Error: ${res.status}`);
+    }
+    return await res.json();
+  };
+
+  const fallback = (reason) => {
+    console.error(`API Fetch Error [${endpoint}]:`, reason);
+    return { success: false, message: 'Server temporarily unavailable or connection failed' };
+  };
+
+  return await apiCircuitBreaker.execute(action, fallback);
 }

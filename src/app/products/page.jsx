@@ -19,6 +19,8 @@ export default function ProductsPage() {
   const [formImage, setFormImage] = useState('');
   const [formCategory, setFormCategory] = useState('');
   const [formDesc, setFormDesc] = useState('');
+  const [formDetails, setFormDetails] = useState('');
+  const [formSpecification, setFormSpecification] = useState('');
   const [formSizes, setFormSizes] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -32,15 +34,15 @@ export default function ProductsPage() {
     if (res.success) setCategories(res.categories || []);
   };
 
-  const fetchProducts = async () => {
-    setLoading(true);
+  const fetchProducts = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     let url = '/products?';
     if (search) url += `search=${encodeURIComponent(search)}&`;
     if (selectedCategory) url += `categoryId=${selectedCategory}&`;
 
     const res = await apiFetch(url);
     if (res.success) setProducts(res.products || []);
-    setLoading(false);
+    if (showLoading) setLoading(false);
   };
 
   const openAddModal = () => {
@@ -49,6 +51,8 @@ export default function ProductsPage() {
     setFormImage('https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=500&q=80');
     setFormCategory(categories[0]?.id || '');
     setFormDesc('');
+    setFormDetails('');
+    setFormSpecification('');
     setFormSizes('');
     setIsModalOpen(true);
   };
@@ -59,6 +63,8 @@ export default function ProductsPage() {
     setFormImage(prod.image);
     setFormCategory(prod.categoryId);
     setFormDesc(prod.description || '');
+    setFormDetails(prod.details || '');
+    setFormSpecification(prod.specification || '');
     setFormSizes(prod.sizes ? prod.sizes.join(', ') : '');
     setIsModalOpen(true);
   };
@@ -73,9 +79,25 @@ export default function ProductsPage() {
       image: formImage,
       categoryId: formCategory,
       description: formDesc,
+      details: formDetails,
+      specification: formSpecification,
       sizes: formSizes.split(',').map(s => s.trim()).filter(Boolean)
       // STRICTLY NO PRICE FIELD!
     };
+
+    // --- OPTIMISTIC UI UPDATE ---
+    const previousProducts = [...products];
+    const catName = categories.find(c => c.id === formCategory)?.name || 'General';
+    
+    if (editingProduct) {
+      // Optimistic Edit
+      setProducts(products.map(p => p.id === editingProduct.id ? { ...p, ...payload, categoryName: catName } : p));
+    } else {
+      // Optimistic Add
+      const tempProduct = { id: 'temp_' + Date.now(), ...payload, categoryName: catName };
+      setProducts([tempProduct, ...products]);
+    }
+    setIsModalOpen(false); // Close instantly
 
     let res;
     if (editingProduct) {
@@ -93,18 +115,31 @@ export default function ProductsPage() {
     setSubmitting(false);
 
     if (res.success) {
-      setIsModalOpen(false);
-      fetchProducts();
+      // Sync real data silently (to replace temporary IDs and sync server state)
+      fetchProducts(false);
     } else {
-      alert(res.message || 'Operation failed');
+      // --- ROLLBACK ---
+      alert(res.message || 'Operation failed. Rolling back changes...');
+      setProducts(previousProducts);
+      setIsModalOpen(true);
     }
   };
 
   const handleDelete = async (id) => {
     if (!confirm('Are you sure you want to delete this product?')) return;
+    
+    // --- OPTIMISTIC UI UPDATE ---
+    const previousProducts = [...products];
+    setProducts(products.filter(p => p.id !== id));
+
     const res = await apiFetch(`/products/${id}`, { method: 'DELETE' });
+    
     if (res.success) {
-      fetchProducts();
+      fetchProducts(false); // Silently sync
+    } else {
+      // --- ROLLBACK ---
+      alert(res.message || 'Delete failed. Rolling back changes...');
+      setProducts(previousProducts);
     }
   };
 
@@ -310,9 +345,31 @@ export default function ProductsPage() {
                 <textarea
                   className="glass-input"
                   rows={3}
-                  placeholder="Product specifications and details..."
+                  placeholder="Product description..."
                   value={formDesc}
                   onChange={(e) => setFormDesc(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Details (Optional)</label>
+                <textarea
+                  className="glass-input"
+                  rows={3}
+                  placeholder="Product details..."
+                  value={formDetails}
+                  onChange={(e) => setFormDetails(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Specification (Optional)</label>
+                <textarea
+                  className="glass-input"
+                  rows={3}
+                  placeholder="Product specifications..."
+                  value={formSpecification}
+                  onChange={(e) => setFormSpecification(e.target.value)}
                 />
               </div>
 

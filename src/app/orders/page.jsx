@@ -14,22 +14,31 @@ export default function OrdersPage() {
     fetchOrders();
   }, [activeTab]);
 
-  const fetchOrders = async () => {
-    setLoading(true);
+  const fetchOrders = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     const res = await apiFetch(`/orders/admin/all-orders?status=${activeTab}`);
     if (res.success) setOrders(res.orders || []);
-    setLoading(false);
+    if (showLoading) setLoading(false);
   };
 
   const handleStatusChange = async (orderId, newStatus) => {
+    // --- OPTIMISTIC UI UPDATE ---
+    const previousOrders = [...orders];
+    setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+
     const res = await apiFetch(`/orders/admin/status/${orderId}`, {
       method: 'PUT',
       body: JSON.stringify({ status: newStatus })
     });
+    
     if (res.success) {
-      fetchOrders();
+      // If we are filtering by a specific tab that isn't 'All' and we change status, 
+      // the order should disappear from this tab. Re-fetching silently handles this.
+      fetchOrders(false);
     } else {
-      alert(res.message || 'Failed to update status');
+      // --- ROLLBACK ---
+      alert(res.message || 'Failed to update status. Rolling back changes...');
+      setOrders(previousOrders);
     }
   };
 
