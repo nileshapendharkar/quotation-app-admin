@@ -44,10 +44,10 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--bg-body)' }}>
       <Sidebar />
+      <Navbar title="Notification System" />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <Navbar title="Notification System" />
 
         <main style={{ padding: '32px', flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
           {/* Send Broadcast Box */}

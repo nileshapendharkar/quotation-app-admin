@@ -199,10 +199,10 @@ export default function UsersPage() {
   });
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: '#0b1329', color: '#f8fafc' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--bg-body)' }}>
       <Sidebar />
+      <Navbar title="Mobile App Credentials & User Management" />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <Navbar title="Mobile App Credentials & User Management" />
 
         <main style={{ padding: '32px', flex: 1 }}>
           {feedback.msg ? (

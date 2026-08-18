@@ -1,9 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Sidebar from '@/components/Sidebar';
 import Navbar from '@/components/Navbar';
-import { Users, FileSpreadsheet, Package, Layers, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import Sidebar from '@/components/Sidebar';
+import { ShoppingCart, Ticket, Users, FileText } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
 export default function DashboardPage() {
@@ -18,7 +18,6 @@ export default function DashboardPage() {
       router.push('/login');
       return;
     }
-
     fetchDashboardData();
   }, []);
 
@@ -33,109 +32,141 @@ export default function DashboardPage() {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--bg-body)' }}>
       <Sidebar />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <Navbar title="Dashboard Overview" />
+      <Navbar />
+      
+      <main style={{ padding: '24px', flex: 1 }}>
+        <h1 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '24px' }}>Dashboard</h1>
 
-        <main style={{ padding: '32px', flex: 1 }}>
-          {/* Header Banner */}
-          <div className="glass-card" style={{ padding: '24px', marginBottom: '32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <h2 style={{ fontSize: '20px', fontWeight: '800', color: '#f8fafc' }}>Welcome to Quotation Admin</h2>
-              <p style={{ fontSize: '14px', color: '#94a3b8', marginTop: '4px' }}>
-                Monitor user quotation requests, manage catalog items, and track dispatch status.
-              </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px' }}>
+          
+          {/* Top Left: Numbers Card */}
+          <div className="glass-card" style={{ flex: '1 1 300px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-around' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#1890ff', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ShoppingCart size={24} />
+                </div>
+                <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: '500' }}>Order</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#1890ff', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ticket size={24} />
+                </div>
+                <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: '500' }}>Tickets</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: '#1890ff', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Users size={24} />
+                </div>
+                <span style={{ fontSize: '13px', color: '#4b5563', fontWeight: '500' }}>Users</span>
+              </div>
             </div>
-            <div style={{ padding: '10px 18px', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56, 189, 248, 0.3)', color: '#38bdf8', fontSize: '13px', fontWeight: '700' }}>
-              Mode: Quotations Only (No Price)
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #f0f0f0', paddingTop: '24px' }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '4px' }}>Users</div>
+                <div style={{ fontSize: '24px', fontWeight: '500' }}>{loading ? '...' : stats?.totalUsers || 0}</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '4px' }}>Pending</div>
+                <div style={{ fontSize: '24px', fontWeight: '500' }}>{loading ? '...' : stats?.pendingOrders || 0}</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '4px' }}>Orders</div>
+                <div style={{ fontSize: '24px', fontWeight: '500' }}>{loading ? '...' : stats?.totalOrders || 0}</div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '4px' }}>Products</div>
+                <div style={{ fontSize: '24px', fontWeight: '500' }}>{loading ? '...' : stats?.totalProducts || 0}</div>
+              </div>
             </div>
           </div>
 
-          {/* Metrics Grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
-            <div className="glass-card" style={{ padding: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Registered Users</span>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#3b82f6' }}>
-                  <Users size={20} />
-                </div>
-              </div>
-              <h3 style={{ fontSize: '28px', fontWeight: '800', color: '#f8fafc' }}>{loading ? '...' : stats?.totalUsers || 0}</h3>
-            </div>
-
-            <div className="glass-card" style={{ padding: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Total Quotations</span>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(56, 189, 248, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#38bdf8' }}>
-                  <FileSpreadsheet size={20} />
-                </div>
-              </div>
-              <h3 style={{ fontSize: '28px', fontWeight: '800', color: '#f8fafc' }}>{loading ? '...' : stats?.totalOrders || 0}</h3>
-            </div>
-
-            <div className="glass-card" style={{ padding: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Pending Requests</span>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(245, 158, 11, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#f59e0b' }}>
-                  <Clock size={20} />
-                </div>
-              </div>
-              <h3 style={{ fontSize: '28px', fontWeight: '800', color: '#f59e0b' }}>{loading ? '...' : stats?.pendingOrders || 0}</h3>
-            </div>
-
-            <div className="glass-card" style={{ padding: '20px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-                <span style={{ fontSize: '13px', color: '#94a3b8', fontWeight: '600' }}>Products (No Price)</span>
-                <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'rgba(139, 92, 246, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#8b5cf6' }}>
-                  <Package size={20} />
-                </div>
-              </div>
-              <h3 style={{ fontSize: '28px', fontWeight: '800', color: '#f8fafc' }}>{loading ? '...' : stats?.totalProducts || 0}</h3>
-            </div>
+          {/* Top Middle: Top Selling Products */}
+          <div className="glass-card" style={{ flex: '1 1 300px', padding: '24px' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>Top selling products</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ padding: '8px 12px', background: '#fafafa', border: 'none', color: '#4b5563' }}>Selling</th>
+                  <th style={{ padding: '8px 12px', background: '#fafafa', border: 'none', color: '#4b5563' }}>Product</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>12</td>
+                  <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>UPVC Pipes</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>8</td>
+                  <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>Water Tanks</td>
+                </tr>
+                <tr>
+                  <td style={{ padding: '12px', borderBottom: 'none' }}>6</td>
+                  <td style={{ padding: '12px', borderBottom: 'none' }}>CPVC Fittings</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
 
-          {/* Recent Orders Section */}
-          <div className="glass-card" style={{ padding: '24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#f8fafc' }}>Recent Quotation Requests</h3>
-              <button onClick={() => router.push('/orders')} className="btn-secondary">View All Orders</button>
-            </div>
+          {/* Top Right: Top Customers */}
+          <div className="glass-card" style={{ flex: '1 1 300px', padding: '24px' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>Top customers</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th style={{ padding: '8px 12px', background: '#fafafa', border: 'none', color: '#4b5563' }}>Quotations</th>
+                  <th style={{ padding: '8px 12px', background: '#fafafa', border: 'none', color: '#4b5563' }}>Customer</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentOrders.slice(0, 3).map((order, i) => (
+                  <tr key={order.id || i}>
+                    <td style={{ padding: '12px', borderBottom: i === 2 ? 'none' : '1px solid #f0f0f0' }}>{order.items?.length || 1} items</td>
+                    <td style={{ padding: '12px', borderBottom: i === 2 ? 'none' : '1px solid #f0f0f0' }}>{order.userName}</td>
+                  </tr>
+                ))}
+                {recentOrders.length === 0 && (
+                  <tr>
+                    <td colSpan="2" style={{ padding: '12px', color: '#9ca3af', textAlign: 'center' }}>No customers yet</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
+        {/* Bottom Section: Charts and Recent Orders */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', marginTop: '24px' }}>
+          
+          <div className="glass-card" style={{ flex: '1 1 400px', padding: '24px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h3 style={{ fontSize: '15px', fontWeight: '600' }}>Recent Quotation Requests</h3>
+              <select className="glass-input" style={{ width: 'auto', padding: '4px 8px' }}>
+                <option>All Status</option>
+                <option>Pending</option>
+              </select>
+            </div>
+            
             {recentOrders.length === 0 ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: '#64748b', fontSize: '14px' }}>
-                No recent quotation requests found.
-              </div>
+              <div style={{ padding: '40px', textAlign: 'center', color: '#9ca3af' }}>No recent requests found.</div>
             ) : (
               <table>
                 <thead>
                   <tr>
-                    <th>Order No</th>
-                    <th>Customer Name</th>
-                    <th>Items Requested</th>
-                    <th>Date</th>
-                    <th>Status</th>
+                    <th style={{ padding: '8px 12px', background: '#fafafa', border: 'none', color: '#4b5563' }}>Order No</th>
+                    <th style={{ padding: '8px 12px', background: '#fafafa', border: 'none', color: '#4b5563' }}>Customer</th>
+                    <th style={{ padding: '8px 12px', background: '#fafafa', border: 'none', color: '#4b5563' }}>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {recentOrders.map(order => (
                     <tr key={order.id}>
-                      <td style={{ fontWeight: '700', color: '#38bdf8' }}>{order.orderNo}</td>
-                      <td>
-                        <div style={{ fontWeight: '600' }}>{order.userName}</div>
-                        <div style={{ fontSize: '12px', color: '#64748b' }}>{order.userEmail}</div>
-                      </td>
-                      <td>
-                        {order.items.map(item => (
-                          <div key={item.productId} style={{ fontSize: '13px' }}>
-                            <strong>{item.productName}</strong> × {item.quantity} units
-                          </div>
-                        ))}
-                      </td>
-                      <td style={{ fontSize: '13px', color: '#94a3b8' }}>
-                        {new Date(order.createdAt).toLocaleDateString()}
-                      </td>
-                      <td>
+                      <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>{order.orderNo}</td>
+                      <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>{order.userName}</td>
+                      <td style={{ padding: '12px', borderBottom: '1px solid #f0f0f0' }}>
                         <span className={`badge badge-${order.status.toLowerCase()}`}>
                           {order.status}
                         </span>
@@ -146,8 +177,27 @@ export default function DashboardPage() {
               </table>
             )}
           </div>
-        </main>
-      </div>
+
+          <div className="glass-card" style={{ flex: '1 1 400px', padding: '24px', minHeight: '300px', display: 'flex', flexDirection: 'column' }}>
+            <h3 style={{ fontSize: '15px', fontWeight: '600', marginBottom: '16px' }}>Category Popularity (Mock Chart)</h3>
+            <div style={{ flex: 1, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', paddingBottom: '20px', gap: '8px' }}>
+              <div style={{ width: '40px', height: '120px', background: '#1677ff' }}></div>
+              <div style={{ width: '40px', height: '180px', background: '#36cfc9' }}></div>
+              <div style={{ width: '40px', height: '60px', background: '#ffc53d' }}></div>
+              <div style={{ width: '40px', height: '140px', background: '#ff7a45' }}></div>
+              <div style={{ width: '40px', height: '160px', background: '#f759ab' }}></div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-around', fontSize: '12px', color: '#9ca3af' }}>
+              <span>Pipes</span>
+              <span>Tanks</span>
+              <span>CPVC</span>
+              <span>UPVC</span>
+              <span>Faucets</span>
+            </div>
+          </div>
+          
+        </div>
+      </main>
     </div>
   );
 }

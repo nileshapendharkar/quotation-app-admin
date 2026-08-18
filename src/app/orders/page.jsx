@@ -59,10 +59,10 @@ export default function OrdersPage() {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--bg-body)' }}>
       <Sidebar />
+      <Navbar title="Quotation Request Orders" />
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <Navbar title="Quotation Request Orders" />
 
         <main style={{ padding: '32px', flex: 1 }}>
           {/* Status Filter Tabs */}
