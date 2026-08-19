@@ -75,6 +75,22 @@ export default function OrdersPage() {
       .catch(err => alert('PDF download failed'));
   };
 
+  const handleDownloadExcel = (orderId, orderNo) => {
+    const token = localStorage.getItem('admin_token');
+    const url = `${API_BASE}/orders/download-excel/${orderId}`;
+    fetch(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => res.blob())
+      .then(blob => {
+        const link = document.createElement('a');
+        link.href = window.URL.createObjectURL(blob);
+        link.download = `Quotation_${orderNo}.xlsx`;
+        link.click();
+      })
+      .catch(err => alert('Excel download failed'));
+  };
+
   // Drag and drop handlers for column configurator
   const handleDragStart = (e, index) => {
     e.dataTransfer.effectAllowed = 'move';
@@ -121,13 +137,37 @@ export default function OrdersPage() {
         );
       case 'items':
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '240px' }}>
             {order.items.map((item, i) => (
-              <div key={i} style={{ fontSize: '13px', background: '#fafafa', border: '1px solid #f0f0f0', padding: '4px 8px', borderRadius: '4px' }}>
-                <strong>{item.productName}{item.size ? ` (Size: ${item.size})` : ''}</strong>
-                <span style={{ color: '#1677ff', fontWeight: '600', marginLeft: '8px' }}>
-                  × {item.quantity}
-                </span>
+              <div key={i} style={{ fontSize: '12px', background: '#f9fafb', border: '1px solid #e5e7eb', padding: '8px 12px', borderRadius: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <span style={{ fontWeight: '700', color: '#1f2937' }}>{item.productName}</span>
+                  <span style={{ color: '#1677ff', fontWeight: '700', background: '#e6f4ff', padding: '2px 6px', borderRadius: '4px', fontSize: '11px' }}>
+                    Quantity Requested: {item.quantity}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', color: '#4b5563', fontSize: '11px', marginTop: '4px' }}>
+                  {item.productCode && (
+                    <span style={{ background: '#f3f4f6', padding: '2px 4px', borderRadius: '4px' }}>
+                      <strong>ProductCode:</strong> {item.productCode}
+                    </span>
+                  )}
+                  {item.size && (
+                    <span style={{ background: '#f3f4f6', padding: '2px 4px', borderRadius: '4px' }}>
+                      <strong>Size:</strong> {item.size}
+                    </span>
+                  )}
+                  {item.packing && (
+                    <span style={{ background: '#f3f4f6', padding: '2px 4px', borderRadius: '4px' }}>
+                      <strong>Packing:</strong> {item.packing}
+                    </span>
+                  )}
+                  {item.categoryName && (
+                    <span style={{ background: '#e0f2fe', color: '#0369a1', padding: '2px 4px', borderRadius: '4px' }}>
+                      {item.categoryName}
+                    </span>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -149,13 +189,22 @@ export default function OrdersPage() {
         );
       case 'actions':
         return (
-          <button
-            onClick={() => handleDownloadPDF(order.id, order.orderNo)}
-            className="btn-secondary"
-            style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', margin: '0 auto' }}
-          >
-            <Download size={14} /> PDF
-          </button>
+          <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+            <button
+              onClick={() => handleDownloadPDF(order.id, order.orderNo)}
+              className="btn-secondary"
+              style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <Download size={14} /> PDF
+            </button>
+            <button
+              onClick={() => handleDownloadExcel(order.id, order.orderNo)}
+              className="btn-secondary"
+              style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '6px', backgroundColor: '#107c41', color: '#fff', border: '1px solid #107c41' }}
+            >
+              <FileSpreadsheet size={14} /> Excel
+            </button>
+          </div>
         );
       default:
         return null;

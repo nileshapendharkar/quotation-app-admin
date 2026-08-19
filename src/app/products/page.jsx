@@ -14,7 +14,8 @@ export default function ProductsPage() {
 
   // Exact complete column list requested by user
   const [columns, setColumns] = useState([
-    { id: 'code', label: 'Product Code', visible: true },
+    { id: 'code', label: 'General ProductCode', visible: true },
+    { id: 'productCode', label: 'Size ProductCode', visible: true },
     { id: 'name', label: 'Product Name', visible: true },
     { id: 'category', label: 'Category', visible: true },
     { id: 'uom', label: 'UOM', visible: true },
@@ -50,7 +51,17 @@ export default function ProductsPage() {
     fetchProducts();
     const savedCols = localStorage.getItem('nocobase_product_cols_v3');
     if (savedCols) {
-      try { setColumns(JSON.parse(savedCols)); } catch(e) {}
+      try {
+        const parsed = JSON.parse(savedCols);
+        // Ensure new column is included even if there's saved storage configuration
+        const hasProductCode = parsed.some(c => c.id === 'productCode');
+        if (!hasProductCode) {
+          const codeIdx = parsed.findIndex(c => c.id === 'code');
+          const insertIdx = codeIdx !== -1 ? codeIdx + 1 : 1;
+          parsed.splice(insertIdx, 0, { id: 'productCode', label: 'ProductCode', visible: true });
+        }
+        setColumns(parsed);
+      } catch(e) {}
     }
   }, []);
 
@@ -93,7 +104,13 @@ export default function ProductsPage() {
 
   const openEditModal = (prod) => {
     setEditingProduct(prod);
-    setFormCode(prod.code || prod.productCode || ('PRD-' + prod.id.slice(-5)));
+    
+    let codeStr = prod.code || prod.productCode || '';
+    if (!codeStr && prod.sizeProductCodes && Object.keys(prod.sizeProductCodes).length > 0) {
+      codeStr = Object.entries(prod.sizeProductCodes).map(([k, v]) => `${k}:${v}`).join(', ');
+    }
+    setFormCode(codeStr || ('PRD-' + prod.id.slice(-5)));
+    
     setFormName(prod.name);
     setFormImage(prod.image);
     setFormCategory(prod.categoryId);
@@ -149,8 +166,19 @@ export default function ProductsPage() {
       });
     }
 
+    let parsedProductCodes = null;
+    let singleCode = formCode;
+    if (formCode && formCode.includes(':')) {
+      parsedProductCodes = {};
+      formCode.split(',').forEach(pair => {
+        const [k, v] = pair.split(':').map(s => s.trim());
+        if (k && v) parsedProductCodes[k] = v;
+      });
+      singleCode = '';
+    }
+
     const payload = {
-      code: formCode,
+      code: singleCode,
       name: formName,
       uom: formUom,
       image: formImage || 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=500&q=80',
@@ -161,7 +189,8 @@ export default function ProductsPage() {
       sizes: formSizes.split(',').map(s => s.trim()).filter(Boolean),
       packing: formPacking,
       status: formStatus,
-      ...(parsedPackSizes && Object.keys(parsedPackSizes).length > 0 ? { packSizes: parsedPackSizes } : {})
+      ...(parsedPackSizes && Object.keys(parsedPackSizes).length > 0 ? { packSizes: parsedPackSizes } : {}),
+      sizeProductCodes: parsedProductCodes || {}
     };
 
     const previousProducts = [...products];
@@ -252,6 +281,19 @@ export default function ProductsPage() {
             {product.code || product.productCode || `PRD-${(product.id || '').slice(-5)}`}
           </div>
         );
+      case 'productCode':
+        if (product.sizeProductCodes && Object.keys(product.sizeProductCodes).length > 0) {
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontFamily: 'monospace', fontSize: '12px' }}>
+              {Object.values(product.sizeProductCodes).map((code, idx) => (
+                <div key={idx} style={{ whiteSpace: 'nowrap', fontWeight: '600', color: '#1677ff' }}>
+                  {code}
+                </div>
+              ))}
+            </div>
+          );
+        }
+        return <span style={{ color: '#9ca3af' }}>-</span>;
       case 'name':
         return <div style={{ fontWeight: '500', color: '#1f2937' }}>{product.name}</div>;
       case 'category':
@@ -504,7 +546,7 @@ export default function ProductsPage() {
                   <input
                     type="text"
                     className="glass-input"
-                    placeholder="e.g. PRD-1001"
+                    placeholder="e.g. PRD-1001 or 300L:FG-400128, 500L:FG-400124"
                     value={formCode}
                     onChange={(e) => setFormCode(e.target.value)}
                     required
