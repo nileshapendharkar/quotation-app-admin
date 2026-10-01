@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
-import Sidebar from '@/components/Sidebar';
-import Navbar from '@/components/Navbar';
-import { Users, Phone, UserPlus, FileSpreadsheet, Trash2, Eye, EyeOff, Search, CheckCircle2, AlertCircle, Upload, Key, X, Settings2, GripVertical, Plus, Edit2, ToggleLeft, ToggleRight, MapPin, Building, Globe } from 'lucide-react';
+import AdminLayout from '@/components/AdminLayout';
+import Icon from '@/components/Icon';
+import { StatCard, Pagination, EmptyState, RoundGlyph, getUrlQuery, dailySeries } from '@/components/ui';
+import { Phone, FileSpreadsheet, Eye, EyeOff, Search, CheckCircle2, AlertCircle, Upload, X, GripVertical, MapPin, Globe, Play } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import * as XLSX from 'xlsx';
 
@@ -12,6 +13,8 @@ export default function UsersPage() {
   const [search, setSearch] = useState('');
   const [showPassMap, setShowPassMap] = useState({});
   const [feedback, setFeedback] = useState({ type: '', msg: '' });
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // List of Indian States & UTs for user location drop-downs
   const INDIAN_STATES = [
@@ -63,6 +66,8 @@ export default function UsersPage() {
   const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
+    const q = getUrlQuery('q');
+    if (q) setSearch(q);
     fetchUsers();
     const savedCols = localStorage.getItem('nocobase_user_cols_v3');
     if (savedCols) {
@@ -90,7 +95,7 @@ export default function UsersPage() {
     setShowPassMap(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // One-click status toggle (Active <-> Inactive) directly syncing to Couchbase
+  // One-click status toggle (Active <-> Inactive) directly syncing to MongoDB
   const handleToggleStatus = async (u) => {
     const nextStatus = u.status === 'Inactive' ? 'Active' : 'Inactive';
     const res = await apiFetch(`/admin/users/${u.id}`, {
@@ -99,7 +104,7 @@ export default function UsersPage() {
     });
 
     if (res.success) {
-      setFeedback({ type: 'success', msg: `User "${u.userId || u.name}" status updated to ${nextStatus} and synced to Couchbase!` });
+      setFeedback({ type: 'success', msg: `User "${u.userId || u.name}" status updated to ${nextStatus} and synced to MongoDB!` });
       fetchUsers();
     } else {
       setFeedback({ type: 'error', msg: res.message || 'Failed to update user status' });
@@ -127,7 +132,7 @@ export default function UsersPage() {
     setSubmitting(false);
 
     if (res.success) {
-      setFeedback({ type: 'success', msg: `User "${newUserId}" created and synced to Couchbase!` });
+      setFeedback({ type: 'success', msg: `User "${newUserId}" created and synced to MongoDB!` });
       setShowAddModal(false);
       setNewUserId(''); setNewPassword(''); setNewName(''); setNewCompanyAddress(''); setNewState('Maharashtra'); setNewStatus('Active');
       fetchUsers();
@@ -173,7 +178,7 @@ export default function UsersPage() {
     setSubmitting(false);
 
     if (res.success) {
-      setFeedback({ type: 'success', msg: `User "${editUserId}" updated and synced to Couchbase!` });
+      setFeedback({ type: 'success', msg: `User "${editUserId}" updated and synced to MongoDB!` });
       setShowEditModal(false);
       setEditUserObj(null);
       fetchUsers();
@@ -256,12 +261,12 @@ export default function UsersPage() {
   // Remove / Delete User from Admin Panel
   const handleDeleteUser = async (user) => {
     const userLabel = user.userId || user.mobile || user.name;
-    if (!confirm(`Are you sure you want to remove user "${userLabel}"? This will permanently remove access and sync directly to Couchbase.`)) return;
+    if (!confirm(`Are you sure you want to remove user "${userLabel}"? This will permanently remove access and sync directly to MongoDB.`)) return;
 
     const res = await apiFetch(`/admin/users/${user.id}`, { method: 'DELETE' });
 
     if (res.success) {
-      setFeedback({ type: 'success', msg: `User ${userLabel} removed successfully from Admin Panel and Couchbase.` });
+      setFeedback({ type: 'success', msg: `User ${userLabel} removed successfully from Admin Panel and MongoDB.` });
       fetchUsers();
     } else {
       setFeedback({ type: 'error', msg: res.message || 'Failed to delete user' });
@@ -303,91 +308,83 @@ export default function UsersPage() {
     return uid.includes(term) || name.includes(term) || addr.includes(term) || st.includes(term);
   });
 
+
+  const COLUMN_LABELS = {
+    userId: 'User ID', password: 'Password', name: 'Account Name', companyAddress: 'Company Physical Address',
+    state: 'State', status: 'Status (Active/Inactive)', date: 'Created Date', actions: 'Actions',
+  };
+
   const renderCell = (col, u) => {
     switch (col.id) {
       case 'userId':
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600', color: '#4f46e5', fontSize: '14px' }}>
-            <Phone size={15} color="#4f46e5" />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#1060ff', fontWeight: 500 }}>
+            <Phone size={15} />
             {u.userId || u.mobile}
           </div>
         );
-      case 'password':
+      case 'password': {
         const isVisible = showPassMap[u.id];
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <span style={{
               fontFamily: isVisible ? 'monospace' : 'inherit',
-              fontSize: isVisible ? '14px' : '16px',
-              letterSpacing: isVisible ? '0' : '2px',
-              color: isVisible ? '#10b981' : '#6b7280'
+              letterSpacing: isVisible ? 0 : '2px',
+              color: isVisible ? '#12a150' : '#6b7280'
             }}>
               {isVisible ? (u.plainPassword || '(Hashed)') : '••••••••'}
             </span>
             <button
               type="button"
               onClick={() => toggleShowPass(u.id)}
-              style={{ background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: '2px' }}
+              style={{ background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer', display: 'flex' }}
               title={isVisible ? 'Hide Password' : 'Show Password'}
             >
               {isVisible ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
         );
+      }
       case 'name':
-        return <span style={{ color: '#1f2937', fontWeight: '600', fontSize: '14px' }}>{u.name || 'Account'}</span>;
+        return <span style={{ fontWeight: 500 }}>{u.name || 'Account'}</span>;
       case 'companyAddress':
         return (
-          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '6px', maxWidth: '240px' }}>
-            <MapPin size={14} color="#9ca3af" style={{ marginTop: '3px', flexShrink: 0 }} />
-            <span style={{ fontSize: '13px', color: '#4b5563', lineHeight: '1.4' }}>
-              {u.companyAddress || u.companyName || 'N/A'}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.4rem', maxWidth: '16rem' }}>
+            <MapPin size={14} color="#9ca3af" style={{ marginTop: 3, flexShrink: 0 }} />
+            <span style={{ fontSize: '0.88rem', color: '#4b5563', lineHeight: 1.4 }}>{u.companyAddress || u.companyName || 'N/A'}</span>
           </div>
         );
       case 'state':
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <Globe size={14} color="#6366f1" />
-            <span style={{ fontSize: '13px', fontWeight: '500', color: '#374151' }}>{u.state || 'Maharashtra'}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+            <Globe size={14} color="#3c51af" />
+            <span style={{ fontSize: '0.9rem' }}>{u.state || 'Maharashtra'}</span>
           </div>
         );
-      case 'status':
+      case 'status': {
         const isActive = u.status !== 'Inactive';
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className={`badge ${isActive ? 'badge-dispatched' : 'badge-cancelled'}`}>
-              {isActive ? 'Active' : 'Inactive'}
-            </span>
+          <div className="status-wrap" style={{ justifyContent: 'center' }}>
+            <span className={`status-badge ${isActive ? 'active' : 'inactive'}`}>{isActive ? 'Active' : 'Inactive'}</span>
             <button
+              className={`switch${isActive ? ' on' : ''}`}
               onClick={() => handleToggleStatus(u)}
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: isActive ? '#10b981' : '#ef4444' }}
               title={`Click to set ${isActive ? 'Inactive' : 'Active'}`}
-            >
-              {isActive ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
-            </button>
+              aria-label={`Set ${isActive ? 'Inactive' : 'Active'}`}
+            />
           </div>
         );
+      }
       case 'date':
-        return <span style={{ fontSize: '13px', color: '#9ca3af' }}>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}</span>;
+        return <span style={{ color: '#6b7280' }}>{u.createdAt ? new Date(u.createdAt).toLocaleDateString() : 'N/A'}</span>;
       case 'actions':
         return (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-            <button
-              onClick={() => openEditModal(u)}
-              className="btn-secondary"
-              style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
-              title="Edit User Credentials & Address"
-            >
-              <Edit2 size={14} /> Edit
+          <div className="row-actions">
+            <button onClick={() => openEditModal(u)} className="btn btn-sm btn-soft-blue" title="Edit user credentials & address">
+              <Icon name="editing" size={18} /> Edit
             </button>
-            <button
-              onClick={() => handleDeleteUser(u)}
-              className="btn-danger"
-              style={{ padding: '6px 10px' }}
-              title="Remove User from Admin Panel"
-            >
-              <Trash2 size={15} />
+            <button onClick={() => handleDeleteUser(u)} className="btn btn-sm btn-soft-red" title="Remove user">
+              <Icon name="bin" size={18} /> Delete
             </button>
           </div>
         );
@@ -397,262 +394,187 @@ export default function UsersPage() {
   };
 
   const visibleCols = columns.filter(c => c.visible);
+  const centered = (id) => ['status', 'date', 'actions', 'state'].includes(id);
+  const pagedUsers = filteredUsers.slice((page - 1) * pageSize, page * pageSize);
+
+  // Stat card numbers
+  const activeCount = users.filter(u => u.status !== 'Inactive').length;
+  const inactiveCount = users.length - activeCount;
+  const now = new Date();
+  const addedThisMonth = users.filter(u => {
+    if (!u.createdAt) return false;
+    const d = new Date(u.createdAt);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const show = (n) => (loading ? '…' : n);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--bg-body)' }}>
-      <Sidebar />
-      <Navbar />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '24px' }}>
+    <AdminLayout
+      title="Authorized App Users"
+      subtitle="Manage access credentials (User ID, Password, Account Name, Physical Address, State, Status.)"
+      breadcrumb={['Users', 'Authorized App Users']}
+    >
+      <div className="stat-grid" style={{ marginTop: '-0.6rem' }}>
+        <StatCard compact tone="indigo" icon={<Icon name="group" size={36} />} value={show(users.length)} label="Total App Users" sub="Authorized users in system" spark={dailySeries(users)} />
+        <StatCard compact tone="mint" icon={<RoundGlyph bg="#0aa53f"><Play size={18} fill="#fff" strokeWidth={0} style={{ marginLeft: 3 }} /></RoundGlyph>} value={show(activeCount)} label="Active Users" sub="Currently active" />
+        <StatCard compact tone="red" icon={<Icon name="pause" size={38} color="#ef3340" />} value={show(inactiveCount)} label="Inactive Users" sub="Not active" />
+        <StatCard compact tone="purple" icon={<Icon name="crowd-of-users" size={40} />} value={show(addedThisMonth.length)} label="Added This Month" sub="New registrations" spark={dailySeries(addedThisMonth, 31)} />
+      </div>
 
+      <div className="ds-card" style={{ marginTop: '1.25rem' }}>
         {feedback.msg && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            padding: '14px 20px',
-            borderRadius: '6px',
-            marginBottom: '24px',
-            background: feedback.type === 'success' ? '#f6ffed' : '#fff2f0',
-            border: `1px solid ${feedback.type === 'success' ? '#b7eb8f' : '#ffccc7'}`,
-            color: feedback.type === 'success' ? '#52c41a' : '#ff4d4f',
-            fontSize: '14px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              {feedback.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-              <span>{feedback.msg}</span>
-            </div>
-            <X size={18} style={{ cursor: 'pointer' }} onClick={() => setFeedback({ type: '', msg: '' })} />
+          <div className={`alert ${feedback.type === 'success' ? 'success' : 'error'}`} style={{ margin: '1rem 1.25rem 0' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              {feedback.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+              {feedback.msg}
+            </span>
+            <button onClick={() => setFeedback({ type: '', msg: '' })} aria-label="Dismiss"><X size={16} /></button>
           </div>
         )}
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <div>
-            <h1 style={{ fontSize: '20px', fontWeight: '700', color: '#111827' }}>Authorized App Users ({users.length})</h1>
-            <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>
-              Manage access credentials (User ID, Password, Account Name, Physical Address, State, Status). Synced with Couchbase Capella.
-            </p>
+        {/* Action toolbar */}
+        <div className="toolbar" style={{ padding: '1.35rem 1.4rem 1.1rem' }}>
+          <div className="search-field" style={{ width: '30.6rem', maxWidth: '100%' }}>
+            <Search size={20} strokeWidth={2.4} className="search-ic" />
+            <input
+              type="text"
+              placeholder="Search User ID, Name, Address, State..."
+              value={search}
+              onChange={e => { setSearch(e.target.value); setPage(1); }}
+            />
           </div>
-        </div>
 
-        <div className="glass-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          
-          {/* Action Toolbar */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid var(--border-color)', flexWrap: 'wrap', gap: '12px' }}>
-            
-            <div style={{ position: 'relative', width: '320px' }}>
-              <Search size={16} color="#9ca3af" style={{ position: 'absolute', left: '12px', top: '10px' }} />
-              <input
-                type="text"
-                className="glass-input"
-                style={{ paddingLeft: '36px', height: '36px' }}
-                placeholder="Search User ID, Name, Address, State..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', position: 'relative' }}>
-              <button 
-                className="btn-secondary" 
-                style={{ height: '36px', padding: '0 12px' }} 
-                onClick={() => setShowColConfig(!showColConfig)}
-              >
-                <Settings2 size={16} style={{ marginRight: '6px', display: 'inline' }} /> Configure Columns
+          <div className="toolbar-group" style={{ gap: '1.25rem' }}>
+            <div style={{ position: 'relative' }}>
+              <button className="btn btn-outline" style={{ minWidth: '14.6rem' }} onClick={() => setShowColConfig(!showColConfig)}>
+                <Icon name="setting" size={24} /> Configure Columns
               </button>
-              
-              {/* Column Configurator Popover */}
+
               {showColConfig && (
-                <div style={{
-                  position: 'absolute',
-                  top: '44px',
-                  right: '250px',
-                  width: '310px',
-                  background: '#fff',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  zIndex: 50,
-                  padding: '12px'
-                }}>
-                  <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '12px', color: '#1f2937' }}>
-                    Configure Columns (Drag to Reorder)
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {columns.map((col, index) => (
-                      <div
-                        key={col.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, index)}
-                        onDragEnd={handleDragEnd}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, index)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '8px',
-                          background: '#fafafa',
-                          border: '1px solid #f0f0f0',
-                          borderRadius: '4px',
-                          cursor: 'grab'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <GripVertical size={14} color="#9ca3af" />
-                          <span style={{ fontSize: '13px', color: '#4b5563' }}>{col.label}</span>
-                        </div>
-                        <button
-                          onClick={() => toggleColumn(col.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: col.visible ? '#4f46e5' : '#9ca3af' }}
-                        >
-                          {col.visible ? <Eye size={16} /> : <EyeOff size={16} />}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                <div className="popover">
+                  <div className="popover-title">Configure Columns (drag to reorder)</div>
+                  {columns.map((col, index) => (
+                    <div
+                      key={col.id}
+                      className="col-row"
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, index)}
+                      onDragEnd={handleDragEnd}
+                      onDragOver={handleDragOver}
+                      onDrop={(e) => handleDrop(e, index)}
+                    >
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <GripVertical size={14} color="#9ca3af" /> {COLUMN_LABELS[col.id] || col.label}
+                      </span>
+                      <button onClick={() => toggleColumn(col.id)} style={{ color: col.visible ? '#0d6efd' : '#9ca3af' }}>
+                        {col.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
-
-              <button
-                className="btn-secondary"
-                style={{ height: '36px', padding: '0 12px', color: '#059669', borderColor: '#a7f3d0', background: '#ecfdf5' }}
-                onClick={() => setShowExcelModal(true)}
-              >
-                <FileSpreadsheet size={16} style={{ marginRight: '6px', display: 'inline' }} /> Import Excel
-              </button>
-
-              <button className="btn-primary" style={{ height: '36px', background: '#4f46e5' }} onClick={() => setShowAddModal(true)}>
-                <Plus size={16} /> Add User
-              </button>
             </div>
-          </div>
 
-          {/* Data Table */}
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  {visibleCols.map(col => (
-                    <th key={col.id} style={{ padding: '12px 24px', textAlign: col.id === 'actions' ? 'center' : 'left' }}>
-                      {col.label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={visibleCols.length} style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>Loading authorized users...</td>
-                  </tr>
-                ) : filteredUsers.length === 0 ? (
-                  <tr>
-                    <td colSpan={visibleCols.length} style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>No users found.</td>
-                  </tr>
-                ) : (
-                  filteredUsers.map(u => (
-                    <tr key={u.id}>
-                      {visibleCols.map(col => (
-                        <td key={col.id} style={{ padding: '12px 24px', textAlign: col.id === 'actions' ? 'center' : 'left' }}>
-                          {renderCell(col, u)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          
-          <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', color: '#9ca3af', fontSize: '13px' }}>
-            Total {filteredUsers.length} authorized app users in Couchbase
+            <button className="btn btn-success-soft" style={{ minWidth: '11.6rem' }} onClick={() => setShowExcelModal(true)}>
+              <FileSpreadsheet size={22} /> Import Excel
+            </button>
+
+            <button className="btn btn-primary" style={{ minWidth: '10.4rem' }} onClick={() => setShowAddModal(true)}>
+              <Icon name="plus" size={22} /> Add User
+            </button>
           </div>
         </div>
+
+        {/* Data table */}
+        <div className="table-wrap">
+          <table className="ds-table">
+            <thead>
+              <tr>
+                {visibleCols.map(col => (
+                  <th key={col.id} className={centered(col.id) ? 'center' : ''} style={col.id === 'userId' ? { paddingLeft: '2rem' } : undefined}>
+                    {COLUMN_LABELS[col.id] || col.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={visibleCols.length} className="empty-cell">Loading authorized users...</td></tr>
+              ) : pagedUsers.map(u => (
+                <tr key={u.id}>
+                  {visibleCols.map(col => (
+                    <td key={col.id} className={centered(col.id) ? 'center' : ''} style={col.id === 'userId' ? { paddingLeft: '2rem' } : undefined}>
+                      {col.id === 'state' ? <div style={{ display: 'inline-flex' }}>{renderCell(col, u)}</div> : renderCell(col, u)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {!loading && filteredUsers.length === 0 && (
+          <EmptyState
+            image="/design/empty-users.png"
+            title={users.length ? 'No users match your search' : 'No users found'}
+            text={users.length ? 'Try a different User ID, name, address or state.' : 'Add app users one by one, or import them from an Excel sheet.'}
+            action={<button className="btn btn-primary" onClick={() => setShowAddModal(true)}><Icon name="plus" size={22} /> Add User</button>}
+          />
+        )}
+
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={filteredUsers.length}
+          onPageChange={setPage}
+          onPageSizeChange={(n) => { setPageSize(n); setPage(1); }}
+          itemLabel="users"
+        />
       </div>
 
       {/* Modal: Add User */}
       {showAddModal && (
         <div className="modal-overlay" onClick={() => setShowAddModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px', borderRadius: '12px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '20px', color: '#111827' }}>
-              Add Authorized App User
-            </h3>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '31rem' }}>
+            <h3 className="modal-title">Add Authorized App User</h3>
 
-            <form onSubmit={handleAddUser} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form onSubmit={handleAddUser} className="modal-form">
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>User ID / Mobile Number *</label>
-                <input
-                  type="text"
-                  className="glass-input"
-                  placeholder="e.g. 9225087140"
-                  value={newUserId}
-                  onChange={e => setNewUserId(e.target.value)}
-                  required
-                />
+                <label className="form-label">User ID / Mobile Number *</label>
+                <input type="text" className="field" placeholder="e.g. 9225087140" value={newUserId} onChange={e => setNewUserId(e.target.value)} required />
+              </div>
+              <div>
+                <label className="form-label">Password *</label>
+                <input type="text" className="field" placeholder="e.g. Pass#1234" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
+              </div>
+              <div>
+                <label className="form-label">Account Name</label>
+                <input type="text" className="field" placeholder="e.g. Ramesh Hardware Store" value={newName} onChange={e => setNewName(e.target.value)} />
+              </div>
+              <div>
+                <label className="form-label">Company Physical Address</label>
+                <textarea className="field" rows={3} placeholder="e.g. Plot No 45, MIDC Industrial Area, Jalgaon" value={newCompanyAddress} onChange={e => setNewCompanyAddress(e.target.value)} />
+              </div>
+              <div className="form-grid-2">
+                <div>
+                  <label className="form-label">State</label>
+                  <select className="field" value={newState} onChange={e => setNewState(e.target.value)}>
+                    {INDIAN_STATES.map(st => <option key={st} value={st}>{st}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Status - Active/Inactive</label>
+                  <select className="field" value={newStatus} onChange={e => setNewStatus(e.target.value)}>
+                    <option value="Active">Active (Can Login & Submit Quotes)</option>
+                    <option value="Inactive">Inactive (Access Blocked)</option>
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Password *</label>
-                <input
-                  type="text"
-                  className="glass-input"
-                  placeholder="e.g. Pass#1234"
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Account Name</label>
-                <input
-                  type="text"
-                  className="glass-input"
-                  placeholder="e.g. Ramesh Hardware Store"
-                  value={newName}
-                  onChange={e => setNewName(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Company Physical Address</label>
-                <textarea
-                  className="glass-input"
-                  style={{ height: '70px', padding: '8px 12px' }}
-                  placeholder="e.g. Plot No 45, MIDC Industrial Area, Jalgaon"
-                  value={newCompanyAddress}
-                  onChange={e => setNewCompanyAddress(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>State</label>
-                <select
-                  className="glass-input"
-                  value={newState}
-                  onChange={e => setNewState(e.target.value)}
-                >
-                  {INDIAN_STATES.map(st => (
-                    <option key={st} value={st}>{st}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Status - Active/Inactive</label>
-                <select
-                  className="glass-input"
-                  value={newStatus}
-                  onChange={e => setNewStatus(e.target.value)}
-                >
-                  <option value="Active">Active (Can Login & Submit Quotes)</option>
-                  <option value="Inactive">Inactive (Access Blocked)</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
-                <button type="button" className="btn-secondary" onClick={() => setShowAddModal(false)}>Cancel</button>
-                <button type="submit" className="btn-primary" style={{ background: '#4f46e5' }} disabled={submitting}>
-                  {submitting ? 'Adding...' : 'Add & Sync Couchbase'}
+              <div className="modal-actions">
+                <button type="button" className="btn btn-outline" onClick={() => setShowAddModal(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? 'Adding...' : 'Add & Sync MongoDB'}
                 </button>
               </div>
             </form>
@@ -663,83 +585,46 @@ export default function UsersPage() {
       {/* Modal: Edit User */}
       {showEditModal && editUserObj && (
         <div className="modal-overlay" onClick={() => { setShowEditModal(false); setEditUserObj(null); }}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px', borderRadius: '12px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '20px', color: '#111827' }}>
-              Edit Authorized User
-            </h3>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '31rem' }}>
+            <h3 className="modal-title">Edit Authorized User</h3>
 
-            <form onSubmit={handleEditUserSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form onSubmit={handleEditUserSubmit} className="modal-form">
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>User ID *</label>
-                <input
-                  type="text"
-                  className="glass-input"
-                  value={editUserId}
-                  onChange={e => setEditUserId(e.target.value)}
-                  required
-                />
+                <label className="form-label">User ID *</label>
+                <input type="text" className="field" value={editUserId} onChange={e => setEditUserId(e.target.value)} required />
+              </div>
+              <div>
+                <label className="form-label">Password (leave blank to keep unchanged)</label>
+                <input type="text" className="field" placeholder="Enter new password to reset" value={editPassword} onChange={e => setEditPassword(e.target.value)} />
+              </div>
+              <div>
+                <label className="form-label">Account Name</label>
+                <input type="text" className="field" value={editName} onChange={e => setEditName(e.target.value)} />
+              </div>
+              <div>
+                <label className="form-label">Company Physical Address</label>
+                <textarea className="field" rows={3} value={editCompanyAddress} onChange={e => setEditCompanyAddress(e.target.value)} />
+              </div>
+              <div className="form-grid-2">
+                <div>
+                  <label className="form-label">State</label>
+                  <select className="field" value={editState} onChange={e => setEditState(e.target.value)}>
+                    {INDIAN_STATES.map(st => <option key={st} value={st}>{st}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="form-label">Status - Active/Inactive</label>
+                  <select className="field" value={editStatus} onChange={e => setEditStatus(e.target.value)}>
+                    <option value="Active">Active (Can Login & Submit Quotes)</option>
+                    <option value="Inactive">Inactive (Access Blocked)</option>
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Password (Leave blank to keep unchanged)</label>
-                <input
-                  type="text"
-                  className="glass-input"
-                  placeholder="Enter new password to reset"
-                  value={editPassword}
-                  onChange={e => setEditPassword(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Account Name</label>
-                <input
-                  type="text"
-                  className="glass-input"
-                  value={editName}
-                  onChange={e => setEditName(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Company Physical Address</label>
-                <textarea
-                  className="glass-input"
-                  style={{ height: '70px', padding: '8px 12px' }}
-                  value={editCompanyAddress}
-                  onChange={e => setEditCompanyAddress(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>State</label>
-                <select
-                  className="glass-input"
-                  value={editState}
-                  onChange={e => setEditState(e.target.value)}
-                >
-                  {INDIAN_STATES.map(st => (
-                    <option key={st} value={st}>{st}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>Status - Active/Inactive</label>
-                <select
-                  className="glass-input"
-                  value={editStatus}
-                  onChange={e => setEditStatus(e.target.value)}
-                >
-                  <option value="Active">Active (Can Login & Submit Quotes)</option>
-                  <option value="Inactive">Inactive (Access Blocked)</option>
-                </select>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
-                <button type="button" className="btn-secondary" onClick={() => { setShowEditModal(false); setEditUserObj(null); }}>Cancel</button>
-                <button type="submit" className="btn-primary" style={{ background: '#4f46e5' }} disabled={submitting}>
-                  {submitting ? 'Saving...' : 'Save & Sync Couchbase'}
+              <div className="modal-actions">
+                <button type="button" className="btn btn-outline" onClick={() => { setShowEditModal(false); setEditUserObj(null); }}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? 'Saving...' : 'Save & Sync MongoDB'}
                 </button>
               </div>
             </form>
@@ -750,69 +635,63 @@ export default function UsersPage() {
       {/* Modal: Upload Excel User List */}
       {showExcelModal && (
         <div className="modal-overlay" onClick={() => { setShowExcelModal(false); setExcelRows([]); setFileName(''); }}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '540px', borderRadius: '12px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px', color: '#111827' }}>
-              Import Users (Excel / CSV)
-            </h3>
-            <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '36rem' }}>
+            <h3 className="modal-title">Import Users (Excel / CSV)</h3>
+            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '-0.6rem', marginBottom: '1.1rem' }}>
               Columns: <strong>A: User ID</strong> | <strong>B: Password</strong> | <strong>C: Account Name</strong> | <strong>D: Physical Address</strong> | <strong>E: State</strong> | <strong>F: Status (Active/Inactive)</strong>
             </p>
 
-            <div style={{ border: '1px dashed #d9d9d9', borderRadius: '8px', padding: '24px', textAlign: 'center', background: '#fafafa', marginBottom: '20px' }}>
-              <Upload size={32} color="#9ca3af" style={{ marginBottom: '12px' }} />
-              <p style={{ fontSize: '14px', color: '#1f2937', marginBottom: '12px', fontWeight: '500' }}>
+            <div className="dropzone">
+              <Upload size={30} color="#8a94a6" style={{ marginBottom: '0.6rem' }} />
+              <p style={{ fontSize: '0.92rem', marginBottom: '0.8rem', fontWeight: 500 }}>
                 {fileName ? `Selected: ${fileName}` : 'Choose Excel File (.xlsx, .csv)'}
               </p>
               <input type="file" accept=".xlsx, .xls, .csv" onChange={handleFileChange} style={{ display: 'none' }} id="excelInput" />
-              <label htmlFor="excelInput" className="btn-secondary" style={{ display: 'inline-block', cursor: 'pointer', padding: '6px 12px' }}>
-                Browse Files
-              </label>
+              <label htmlFor="excelInput" className="btn btn-sm btn-outline" style={{ cursor: 'pointer' }}>Browse Files</label>
             </div>
 
             {excelRows.length > 0 && (
-              <div style={{ marginBottom: '20px' }}>
-                <h4 style={{ fontSize: '13px', color: '#1f2937', marginBottom: '8px', fontWeight: '600' }}>
-                  Preview ({excelRows.length} rows)
-                </h4>
-                <div style={{ maxHeight: '160px', overflowY: 'auto', background: '#f5f5f5', borderRadius: '6px', padding: '8px', border: '1px solid #f0f0f0' }}>
-                  <table style={{ width: '100%', fontSize: '12px', textAlign: 'left' }}>
+              <div style={{ marginBottom: '1.2rem' }}>
+                <h4 style={{ fontSize: '0.85rem', marginBottom: '0.5rem', fontWeight: 600 }}>Preview ({excelRows.length} rows)</h4>
+                <div style={{ maxHeight: '10rem', overflowY: 'auto', background: '#f8fafd', borderRadius: '0.5rem', padding: '0.5rem', border: '1px solid #edf0f5' }}>
+                  <table style={{ width: '100%', fontSize: '0.75rem', textAlign: 'left' }}>
                     <thead>
                       <tr>
-                        <th style={{ padding: '4px' }}>User ID</th>
-                        <th style={{ padding: '4px' }}>Password</th>
-                        <th style={{ padding: '4px' }}>Account Name</th>
-                        <th style={{ padding: '4px' }}>Address</th>
-                        <th style={{ padding: '4px' }}>State</th>
-                        <th style={{ padding: '4px' }}>Status</th>
+                        <th style={{ padding: 4 }}>User ID</th>
+                        <th style={{ padding: 4 }}>Password</th>
+                        <th style={{ padding: 4 }}>Account Name</th>
+                        <th style={{ padding: 4 }}>Address</th>
+                        <th style={{ padding: 4 }}>State</th>
+                        <th style={{ padding: 4 }}>Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {excelRows.slice(0, 5).map((row, idx) => (
                         <tr key={idx}>
-                          <td style={{ padding: '4px' }}>{row.userId}</td>
-                          <td style={{ padding: '4px', color: '#6b7280' }}>{row.password}</td>
-                          <td style={{ padding: '4px' }}>{row.name || '-'}</td>
-                          <td style={{ padding: '4px' }}>{row.companyAddress || '-'}</td>
-                          <td style={{ padding: '4px' }}>{row.state || '-'}</td>
-                          <td style={{ padding: '4px' }}>{row.status}</td>
+                          <td style={{ padding: 4 }}>{row.userId}</td>
+                          <td style={{ padding: 4, color: '#6b7280' }}>{row.password}</td>
+                          <td style={{ padding: 4 }}>{row.name || '-'}</td>
+                          <td style={{ padding: 4 }}>{row.companyAddress || '-'}</td>
+                          <td style={{ padding: 4 }}>{row.state || '-'}</td>
+                          <td style={{ padding: 4 }}>{row.status}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  {excelRows.length > 5 && <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '6px', textAlign: 'center' }}>...and {excelRows.length - 5} more</div>}
+                  {excelRows.length > 5 && <div style={{ fontSize: '0.7rem', color: '#9ca3af', marginTop: 6, textAlign: 'center' }}>...and {excelRows.length - 5} more</div>}
                 </div>
               </div>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <button type="button" className="btn-secondary" onClick={() => { setShowExcelModal(false); setExcelRows([]); setFileName(''); }}>Cancel</button>
-              <button type="button" className="btn-primary" style={{ background: '#4f46e5' }} onClick={handleExcelUpload} disabled={uploading || excelRows.length === 0}>
+            <div className="modal-actions">
+              <button type="button" className="btn btn-outline" onClick={() => { setShowExcelModal(false); setExcelRows([]); setFileName(''); }}>Cancel</button>
+              <button type="button" className="btn btn-primary" onClick={handleExcelUpload} disabled={uploading || excelRows.length === 0}>
                 {uploading ? 'Importing...' : `Import ${excelRows.length} Users & Sync`}
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </AdminLayout>
   );
 }

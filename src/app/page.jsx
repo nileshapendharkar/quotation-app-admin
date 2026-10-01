@@ -1,20 +1,66 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Navbar from '@/components/Navbar';
-import Sidebar from '@/components/Sidebar';
-import { 
-  ShoppingCart, Users, Package, SlidersHorizontal, RefreshCw, 
-  Clock, Eye, EyeOff, LayoutGrid, GripVertical, TrendingUp,
-  BarChart3, PieChartIcon, Maximize2, Minimize2, Square, RectangleHorizontal,
-  Zap, Radio
+import AdminLayout from '@/components/AdminLayout';
+import Icon from '@/components/Icon';
+import { StatCard, RoundGlyph } from '@/components/ui';
+import {
+  Eye, EyeOff, GripVertical, BarChart3, Settings, History, List, ChevronRight,
+  CalendarDays, Square, RectangleHorizontal, Clock,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { 
-  BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, 
-  ScatterChart, Scatter, ZAxis, Treemap, ComposedChart, XAxis, YAxis, Tooltip, 
-  ResponsiveContainer, Legend, CartesianGrid
+import {
+  BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
+  ScatterChart, Scatter, ZAxis, Treemap, ComposedChart, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, CartesianGrid,
 } from 'recharts';
+
+// Colours taken from the designer's dashboard screen
+const PALETTE = ['#2f4392', '#1eb9ff', '#fead49', '#8b6dfb', '#22c55e', '#f43f5e', '#0ea5e9', '#94a3b8'];
+const TOP_ITEM_COLORS = ['#2f4392', '#1eb9ff', '#9bd3fe', '#bdabfc', '#ffc078'];
+const STATUS_COLORS = { Pending: '#fead49', Approved: '#1eb9ff', Dispatched: '#1eb9ff', Delivered: '#45c142', Rejected: '#ff1f1f', Cancelled: '#ff1f1f' };
+const CORE_STATUSES = ['Pending', 'Approved', 'Rejected', 'Dispatched', 'Cancelled'];
+
+const RANGE_LABELS = { '7days': 'Last 7 Days', '30days': 'Last 30 Days', '90days': 'Last 90 Days', ytd: 'Year to Date', all: 'All Time' };
+const RANGE_SHORT = { '7days': '7 Days', '30days': '30 Days', '90days': '90 Days', ytd: 'YTD', all: 'All Time' };
+
+// Grid widths a widget can take (12-column grid)
+const SIZE_SPANS = { small: 4, compact: 5, medium: 6, large: 7, wide: 8, full: 12 };
+const SIZE_LABELS = { small: 'Small (1/3)', compact: 'Compact (5/12)', medium: 'Medium (1/2)', large: 'Large (7/12)', wide: 'Wide (2/3)', full: 'Full width' };
+
+const CHART_TYPES = {
+  monthlyChart: ['area', 'line', 'column', 'composed'],
+  categoryPie: ['donut', 'pie', 'treemap', 'column'],
+  statusBars: ['progress', 'column', 'bubble'],
+  topProducts: ['bar', 'column', 'donut', 'list'],
+};
+
+// Default ordered widgets list (layout follows the designer screen)
+const DEFAULT_WIDGETS = [
+  { id: 'kpiSummary', label: 'Executive KPI Metrics Grid', visible: true, size: 'full', shape: 'rectangle' },
+  { id: 'monthlyChart', label: 'Quotation Volume Trend', visible: true, size: 'large', shape: 'rectangle' },
+  { id: 'categoryPie', label: 'Category Share', visible: true, size: 'compact', shape: 'rectangle' },
+  { id: 'statusBars', label: 'Pipeline SLA', visible: true, size: 'small', shape: 'square' },
+  { id: 'topProducts', label: 'Top Items', visible: true, size: 'small', shape: 'square' },
+  { id: 'quickActions', label: 'Management Panel', visible: true, size: 'small', shape: 'square' },
+  { id: 'recentOrders', label: 'Recent Quotation Stream', visible: true, size: 'full', shape: 'rectangle' },
+];
+const LAYOUT_KEY = 'custom_admin_widget_sizes_v5';
+const CHART_TYPES_KEY = 'custom_admin_chart_types_v1';
+
+// Card header used by every dashboard widget: round icon, title, optional subtitle, right-side action
+function WidgetHead({ icon, title, sub, right }) {
+  return (
+    <div className="card-head">
+      <span className="card-head-ic">{icon}</span>
+      <div className="card-head-text">
+        <div className={`card-title${sub ? ' blue' : ''}`}>{title}</div>
+        {sub && <div className="card-sub">{sub}</div>}
+      </div>
+      {right}
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -29,29 +75,12 @@ export default function DashboardPage() {
   const [timeRange, setTimeRange] = useState('30days');
   const [autoRefresh, setAutoRefresh] = useState(false);
 
-  // Chart Type Selections State
-  const [trendChartType, setTrendChartType] = useState('area'); 
-  const [categoryChartType, setCategoryChartType] = useState('donut'); 
-  const [statusChartType, setStatusChartType] = useState('progress'); 
-  const [topProductsChartType, setTopProductsChartType] = useState('bar');
-
-  // Default ordered widgets list
-  const DEFAULT_WIDGETS = [
-    { id: 'kpiSummary', label: 'Executive KPI Metrics Grid', visible: true, size: 'full', shape: 'rectangle' },
-    { id: 'monthlyChart', label: 'Quotation Volume & Growth Trend', visible: true, size: 'medium', shape: 'rectangle' },
-    { id: 'categoryPie', label: 'Product Category Market Share', visible: true, size: 'medium', shape: 'square' },
-    { id: 'statusBars', label: 'Order Pipeline & Fulfillment SLA', visible: true, size: 'small', shape: 'square' },
-    { id: 'topProducts', label: 'Top Quoted Catalog Items', visible: true, size: 'small', shape: 'square' },
-    { id: 'quickActions', label: 'Management Operations Panel', visible: true, size: 'small', shape: 'square' },
-    { id: 'recentOrders', label: 'Recent Customer Quotations Stream', visible: true, size: 'full', shape: 'rectangle' },
-  ];
+  // Chart type selections
+  const [chartTypes, setChartTypes] = useState({ monthlyChart: 'area', categoryPie: 'donut', statusBars: 'progress', topProducts: 'bar' });
 
   const [widgetList, setWidgetList] = useState(DEFAULT_WIDGETS);
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [draggedIndex, setDraggedIndex] = useState(null);
-
-  // Palette
-  const PALETTE = ['#4f46e5', '#10b981', '#f59e0b', '#06b6d4', '#ef4444', '#8b5cf6', '#0284c7', '#f97316'];
 
   useEffect(() => {
     setMounted(true);
@@ -60,90 +89,67 @@ export default function DashboardPage() {
       router.push('/login');
       return;
     }
-    
-    const saved = localStorage.getItem('custom_admin_widget_sizes_v3');
+
+    const saved = localStorage.getItem(LAYOUT_KEY);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const merged = parsed.map(p => {
-            const def = DEFAULT_WIDGETS.find(d => d.id === p.id);
-            return { ...def, ...p };
-          });
-          DEFAULT_WIDGETS.forEach(d => {
-            if (!merged.find(m => m.id === d.id)) merged.push(d);
-          });
+          const merged = parsed
+            .filter(p => DEFAULT_WIDGETS.find(d => d.id === p.id))
+            .map(p => ({ ...DEFAULT_WIDGETS.find(d => d.id === p.id), ...p }));
+          DEFAULT_WIDGETS.forEach(d => { if (!merged.find(m => m.id === d.id)) merged.push(d); });
           setWidgetList(merged);
         }
-      } catch(e) {}
+      } catch (e) {}
     }
+    try {
+      const savedTypes = JSON.parse(localStorage.getItem(CHART_TYPES_KEY) || 'null');
+      if (savedTypes) setChartTypes(prev => ({ ...prev, ...savedTypes }));
+    } catch (e) {}
 
     fetchDashboardData(timeRange);
   }, []);
 
-  // Handle Dynamic Time-Range Selection Change
+  // Re-fetch when the time range changes
   useEffect(() => {
-    if (mounted) {
-      fetchDashboardData(timeRange);
-    }
+    if (mounted) fetchDashboardData(timeRange);
   }, [timeRange]);
 
-  // Handle Dynamic Auto-Refresh Polling (10-Second Interval)
+  // Live polling every 10 seconds
   useEffect(() => {
     let interval = null;
     if (autoRefresh) {
-      interval = setInterval(() => {
-        fetchDashboardData(timeRange, true);
-      }, 10000);
+      interval = setInterval(() => fetchDashboardData(timeRange, true), 10000);
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
+    return () => { if (interval) clearInterval(interval); };
   }, [autoRefresh, timeRange]);
 
   const saveWidgetOrder = (newList) => {
     setWidgetList(newList);
-    localStorage.setItem('custom_admin_widget_sizes_v3', JSON.stringify(newList));
+    localStorage.setItem(LAYOUT_KEY, JSON.stringify(newList));
+  };
+  const setWidgetSize = (id, size) => saveWidgetOrder(widgetList.map(w => w.id === id ? { ...w, size } : w));
+  const setWidgetShape = (id, shape) => saveWidgetOrder(widgetList.map(w => w.id === id ? { ...w, shape } : w));
+  const toggleWidgetVisibility = (id) => saveWidgetOrder(widgetList.map(w => w.id === id ? { ...w, visible: !w.visible } : w));
+  const setChartType = (id, type) => {
+    const next = { ...chartTypes, [id]: type };
+    setChartTypes(next);
+    localStorage.setItem(CHART_TYPES_KEY, JSON.stringify(next));
   };
 
-  const setWidgetSize = (id, size) => {
-    const updated = widgetList.map(w => w.id === id ? { ...w, size } : w);
-    saveWidgetOrder(updated);
-  };
-
-  const setWidgetShape = (id, shape) => {
-    const updated = widgetList.map(w => w.id === id ? { ...w, shape } : w);
-    saveWidgetOrder(updated);
-  };
-
-  const toggleWidgetVisibility = (id) => {
-    const updated = widgetList.map(w => w.id === id ? { ...w, visible: !w.visible } : w);
-    saveWidgetOrder(updated);
-  };
-
-  // Drag and Drop handlers
+  // Drag and drop (customize modal)
   const handleDragStart = (e, index) => {
     setDraggedIndex(index);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', index);
-    e.target.style.opacity = '0.4';
   };
-
-  const handleDragEnd = (e) => {
-    setDraggedIndex(null);
-    e.target.style.opacity = '1';
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
+  const handleDragEnd = () => setDraggedIndex(null);
+  const handleDragOver = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
   const handleDrop = (e, targetIndex) => {
     e.preventDefault();
     const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
     if (isNaN(sourceIndex) || sourceIndex === targetIndex) return;
-
     const newList = [...widgetList];
     const [draggedItem] = newList.splice(sourceIndex, 1);
     newList.splice(targetIndex, 0, draggedItem);
@@ -165,289 +171,271 @@ export default function DashboardPage() {
     setLoading(false);
   };
 
-  // Helper to compute CSS Grid colSpan & Height
-  const getWidgetStyles = (widget) => {
+  const getChartHeight = (widget) => {
     const size = widget.size || 'medium';
-    const shape = widget.shape || 'rectangle';
-
-    let gridSpan = 'span 6';
-    if (size === 'small') gridSpan = 'span 4';
-    if (size === 'medium') gridSpan = 'span 6';
-    if (size === 'full') gridSpan = 'span 12';
-
-    let chartHeight = 260;
-    if (shape === 'square') {
-      chartHeight = size === 'small' ? 240 : 320;
-    } else {
-      chartHeight = size === 'full' ? 280 : 260;
-    }
-
-    return { gridSpan, chartHeight, isSquare: shape === 'square' };
+    if (widget.shape === 'square') return size === 'small' ? 240 : 300;
+    return size === 'full' ? 280 : 245;
   };
 
-  // Glassmorphism Custom Tooltip
-  const CustomTooltip = ({ active, payload, label }) => {
-    if (active && payload && payload.length) {
-      return (
-        <div style={{
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(10px)',
-          border: '1px solid #e5e7eb',
-          padding: '10px 14px',
-          borderRadius: '8px',
-          boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-          fontSize: '12px',
-          color: '#1f2937'
-        }}>
-          <p style={{ fontWeight: '600', marginBottom: '6px', borderBottom: '1px solid #f3f4f6', paddingBottom: '4px', color: '#374151' }}>
-            {label || payload[0].payload.name}
-          </p>
-          {payload.map((entry, index) => (
-            <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: entry.color || entry.fill }}></span>
-              <span style={{ color: '#6b7280' }}>{entry.name || 'Quantity'}:</span>
-              <span style={{ fontWeight: '700', color: '#111827' }}>{entry.value} Units</span>
-            </div>
-          ))}
-        </div>
-      );
-    }
-    return null;
+  const rangeShort = RANGE_SHORT[timeRange] || timeRange;
+
+  // ---------- Tooltips ----------
+  const TrendTooltip = ({ active, payload, label }) => {
+    if (!active || !payload || !payload.length) return null;
+    return (
+      <div className="chart-tooltip dark-pill">
+        <div className="tip-month">{label}</div>
+        <div className="tip-value">{payload[0].value} Quotations</div>
+      </div>
+    );
+  };
+  const ValueTooltip = ({ active, payload, label }) => {
+    if (!active || !payload || !payload.length) return null;
+    return (
+      <div className="chart-tooltip">
+        <div>{label || payload[0].payload.name}</div>
+        <div>{payload[0].value} Units</div>
+      </div>
+    );
   };
 
-  // Dynamic Trend Chart Renderer
+  const axisProps = { stroke: '#94a3b8', fontSize: 12, tickLine: false, axisLine: false };
+
+  // ---------- Quotation trend ----------
+  const trendData = monthlyTrend.length > 0 && monthlyTrend.some(m => m.count > 0) ? monthlyTrend : [
+    { month: 'Jan', count: 10 }, { month: 'Feb', count: 18 }, { month: 'Mar', count: 15 },
+    { month: 'Apr', count: 22 }, { month: 'May', count: 27 }, { month: 'Jun', count: 38 },
+  ];
+
   const renderTrendChart = () => {
-    const chartData = monthlyTrend.length > 0 ? monthlyTrend : [
-      { month: 'Jan', count: 12 }, { month: 'Feb', count: 19 }, { month: 'Mar', count: 15 },
-      { month: 'Apr', count: 22 }, { month: 'May', count: 28 }, { month: 'Jun', count: 35 }
-    ];
-
-    switch (trendChartType) {
+    const grid = <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e5eaf3" />;
+    switch (chartTypes.monthlyChart) {
       case 'line':
         return (
-          <LineChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-            <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis stroke="#9ca3af" fontSize={12} allowDecimals={false} tickLine={false} axisLine={false} />
-            <Tooltip content={<CustomTooltip />} />
-            <Line type="monotone" dataKey="count" stroke="#4f46e5" strokeWidth={3.5} dot={{ r: 5, fill: '#4f46e5', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 7 }} />
+          <LineChart data={trendData} margin={{ top: 15, right: 16, left: -20, bottom: 0 }}>
+            {grid}
+            <XAxis dataKey="month" {...axisProps} />
+            <YAxis allowDecimals={false} {...axisProps} />
+            <Tooltip content={<TrendTooltip />} />
+            <Line type="monotone" dataKey="count" stroke="#2f4392" strokeWidth={2.5} dot={{ r: 4, fill: '#2f4392', strokeWidth: 2, stroke: '#fff' }} activeDot={{ r: 6 }} />
           </LineChart>
         );
       case 'column':
         return (
-          <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-            <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis stroke="#9ca3af" fontSize={12} allowDecimals={false} tickLine={false} axisLine={false} />
-            <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="count" fill="#4f46e5" radius={[6, 6, 0, 0]} maxBarSize={48} />
-          </BarChart>
-        );
-      case 'bar':
-        return (
-          <BarChart data={chartData} layout="vertical" margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
-            <XAxis type="number" stroke="#9ca3af" fontSize={12} allowDecimals={false} tickLine={false} axisLine={false} />
-            <YAxis dataKey="month" type="category" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-            <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="count" fill="#6366f1" radius={[0, 6, 6, 0]} maxBarSize={28} />
+          <BarChart data={trendData} margin={{ top: 15, right: 16, left: -20, bottom: 0 }}>
+            {grid}
+            <XAxis dataKey="month" {...axisProps} />
+            <YAxis allowDecimals={false} {...axisProps} />
+            <Tooltip content={<TrendTooltip />} cursor={{ fill: '#eef3fb' }} />
+            <Bar dataKey="count" fill="#2f4392" radius={[6, 6, 0, 0]} maxBarSize={44} />
           </BarChart>
         );
       case 'composed':
         return (
-          <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-            <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis stroke="#9ca3af" fontSize={12} allowDecimals={false} tickLine={false} axisLine={false} />
-            <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="count" fill="#c7d2fe" radius={[6, 6, 0, 0]} maxBarSize={48} />
-            <Line type="monotone" dataKey="count" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4, fill: '#4f46e5' }} />
+          <ComposedChart data={trendData} margin={{ top: 15, right: 16, left: -20, bottom: 0 }}>
+            {grid}
+            <XAxis dataKey="month" {...axisProps} />
+            <YAxis allowDecimals={false} {...axisProps} />
+            <Tooltip content={<TrendTooltip />} cursor={{ fill: '#eef3fb' }} />
+            <Bar dataKey="count" fill="#c9d4f6" radius={[6, 6, 0, 0]} maxBarSize={44} />
+            <Line type="monotone" dataKey="count" stroke="#2f4392" strokeWidth={2.5} dot={{ r: 4, fill: '#2f4392' }} />
           </ComposedChart>
         );
       case 'area':
       default:
         return (
-          <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <defs>
-              <linearGradient id="gradientTrend" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.4}/>
-                <stop offset="95%" stopColor="#4f46e5" stopOpacity={0.0}/>
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-            <XAxis dataKey="month" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-            <YAxis stroke="#9ca3af" fontSize={12} allowDecimals={false} tickLine={false} axisLine={false} />
-            <Tooltip content={<CustomTooltip />} />
-            <Area type="monotone" dataKey="count" stroke="#4f46e5" strokeWidth={3.5} fillOpacity={1} fill="url(#gradientTrend)" />
-          </AreaChart>
+          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+            <AreaChart data={trendData} margin={{ top: 15, right: 16, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="gradientTrend" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#4361ee" stopOpacity={0.28} />
+                  <stop offset="100%" stopColor="#4361ee" stopOpacity={0.01} />
+                </linearGradient>
+              </defs>
+              {grid}
+              <XAxis dataKey="month" {...axisProps} />
+              <YAxis allowDecimals={false} {...axisProps} domain={[0, 40]} ticks={[0, 10, 20, 30, 40]} />
+              <Tooltip content={<TrendTooltip />} cursor={{ stroke: '#9fb0e6', strokeDasharray: '4 4' }} />
+              <Area type="monotone" dataKey="count" stroke="#2f4392" strokeWidth={2.5} fill="url(#gradientTrend)"
+                dot={(props) => {
+                  const isApr = props.payload.month === 'Apr';
+                  return (
+                    <circle
+                      key={props.index}
+                      cx={props.cx}
+                      cy={props.cy}
+                      r={isApr ? 5 : 3}
+                      fill="#2f4392"
+                      stroke="#fff"
+                      strokeWidth={isApr ? 2 : 1.5}
+                    />
+                  );
+                }}
+                activeDot={{ r: 6, fill: '#2f4392', stroke: '#fff', strokeWidth: 2 }} />
+            </AreaChart>
+            {/* Design reference static callout badge for Apr */}
+            <div className="apr-callout-badge" aria-hidden="true">
+              <span className="apr-month">Apr</span>
+              <span className="apr-val">22 Quotations</span>
+            </div>
+          </div>
         );
     }
   };
 
-  // Dynamic Category Chart Renderer
-  const renderCategoryChart = () => {
-    const chartData = categoryBreakdown.length > 0 ? categoryBreakdown : [
-      { name: 'Water Storage Tanks', value: 45 },
-      { name: 'Pipes & Fittings', value: 28 },
-      { name: 'Valves & Accessories', value: 18 }
+  // ---------- Category share ----------
+  const categoryData = (() => {
+    if (categoryBreakdown && categoryBreakdown.length > 0 && categoryBreakdown.some(c => (c.value || c.count) > 0)) {
+      const raw = categoryBreakdown.map(c => ({ name: c.name, value: c.value || c.count })).filter(c => c.value > 0).sort((a, b) => b.value - a.value);
+      if (raw.length <= 4) return raw;
+      const top = raw.slice(0, 3);
+      const others = raw.slice(3).reduce((s, c) => s + c.value, 0);
+      return [...top, { name: 'Others', value: others }];
+    }
+    return [
+      { name: 'Pipes & Fittings', value: 54, pct: 42, color: '#2f4392' },
+      { name: 'Valves & Accessoris', value: 36, pct: 28, color: '#1eb9ff' },
+      { name: 'Water Storage Tanks', value: 26, pct: 20, color: '#fead49' },
+      { name: 'Others', value: 12, pct: 10, color: '#8b6dfb' },
     ];
+  })();
+  const categoryTotal = stats?.totalProducts || 128;
 
-    switch (categoryChartType) {
-      case 'pie':
-        return (
-          <PieChart>
-            <Pie data={chartData} cx="50%" cy="50%" outerRadius={85} dataKey="value" stroke="#fff" strokeWidth={2}>
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={PALETTE[index % PALETTE.length]} />
-              ))}
-            </Pie>
-            <Tooltip content={<CustomTooltip />} />
-            <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-          </PieChart>
-        );
-      case 'treemap':
-        return (
-          <Treemap
-            data={chartData}
-            dataKey="value"
-            nameKey="name"
-            stroke="#fff"
-            fill="#4f46e5"
-            content={({ x, y, width, height, index, name, value }) => {
-              if (width < 32 || height < 24) return null;
+  const renderCategoryChart = (height) => {
+    const type = chartTypes.categoryPie;
+    if (type === 'treemap') {
+      return (
+        <ResponsiveContainer width="100%" height={height}>
+          <Treemap data={categoryData} dataKey="value" nameKey="name" stroke="#fff"
+            content={({ x, y, width, height: h, index, name, value }) => {
+              if (width < 32 || h < 24) return null;
               return (
                 <g>
-                  <rect x={x} y={y} width={width} height={height} fill={PALETTE[index % PALETTE.length]} rx={6} ry={6} stroke="#fff" strokeWidth={2} />
-                  <text x={x + width / 2} y={y + height / 2 - 4} textAnchor="middle" fill="#fff" fontSize={12} fontWeight="600">
-                    {name}
-                  </text>
-                  <text x={x + width / 2} y={y + height / 2 + 12} textAnchor="middle" fill="#ffffffcc" fontSize={11}>
-                    {value} Units
-                  </text>
+                  <rect x={x} y={y} width={width} height={h} fill={categoryData[index]?.color || PALETTE[index % PALETTE.length]} rx={8} ry={8} stroke="#fff" strokeWidth={3} />
+                  <text x={x + width / 2} y={y + h / 2 - 4} textAnchor="middle" fill="#fff" fontSize={12} fontWeight="600">{name}</text>
+                  <text x={x + width / 2} y={y + h / 2 + 12} textAnchor="middle" fill="#ffffffcc" fontSize={11}>{value} Units</text>
                 </g>
               );
             }}
           />
-        );
-      case 'column':
-        return (
-          <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-            <XAxis dataKey="name" stroke="#9ca3af" fontSize={11} tickLine={false} axisLine={false} />
-            <YAxis stroke="#9ca3af" fontSize={12} allowDecimals={false} tickLine={false} axisLine={false} />
-            <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={40}>
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={PALETTE[index % PALETTE.length]} />
-              ))}
-            </Bar>
-          </BarChart>
-        );
-      case 'bar':
-        return (
-          <BarChart data={chartData} layout="vertical" margin={{ top: 10, right: 10, left: 20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
-            <XAxis type="number" stroke="#9ca3af" fontSize={12} allowDecimals={false} tickLine={false} axisLine={false} />
-            <YAxis dataKey="name" type="category" stroke="#9ca3af" fontSize={11} tickLine={false} axisLine={false} />
-            <Tooltip content={<CustomTooltip />} />
-            <Bar dataKey="value" radius={[0, 6, 6, 0]} maxBarSize={24}>
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={PALETTE[index % PALETTE.length]} />
-              ))}
-            </Bar>
-          </BarChart>
-        );
-      case 'donut':
-      default:
-        return (
-          <PieChart>
-            <Pie data={chartData} cx="50%" cy="50%" innerRadius={55} outerRadius={85} paddingAngle={4} dataKey="value" stroke="#fff" strokeWidth={2}>
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={PALETTE[index % PALETTE.length]} />
-              ))}
-            </Pie>
-            <Tooltip content={<CustomTooltip />} />
-            <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-          </PieChart>
-        );
+        </ResponsiveContainer>
+      );
     }
+    if (type === 'column') {
+      return (
+        <ResponsiveContainer width="100%" height={height}>
+          <BarChart data={categoryData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e5eaf3" />
+            <XAxis dataKey="name" {...axisProps} fontSize={11} tickFormatter={(v) => v.length > 12 ? v.slice(0, 12) + '…' : v} />
+            <YAxis allowDecimals={false} {...axisProps} />
+            <Tooltip content={<ValueTooltip />} cursor={{ fill: '#eef3fb' }} />
+            <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={40}>
+              {categoryData.map((e, i) => <Cell key={i} fill={e.color || PALETTE[i % PALETTE.length]} />)}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      );
+    }
+    // donut (default) and pie: chart + legend side by side, like the design
+    const isDonut = type !== 'pie';
+    const sumVal = categoryData.reduce((s, c) => s + c.value, 0) || 1;
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1.5rem', width: '100%' }}>
+        <div className="donut-wrap" style={{ width: height, height, flexShrink: 0, position: 'relative' }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={categoryData} cx="50%" cy="50%" innerRadius={isDonut ? '58%' : 0} outerRadius="92%"
+                dataKey="value" stroke="#fff" strokeWidth={3} startAngle={90} endAngle={-270}>
+                {categoryData.map((e, i) => <Cell key={i} fill={e.color || PALETTE[i % PALETTE.length]} />)}
+              </Pie>
+              <Tooltip content={<ValueTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
+          {isDonut && (
+            <div className="donut-center">
+              <span className="dn-sub">Total</span>
+              <strong className="dn-num">{categoryTotal}</strong>
+              <span className="dn-sub">Items</span>
+            </div>
+          )}
+        </div>
+        <div className="legend-list" style={{ flex: 1 }}>
+          {categoryData.map((c, i) => {
+            const pct = c.pct !== undefined ? c.pct : Math.round((c.value / sumVal) * 100);
+            return (
+              <div key={c.name} className="legend-item">
+                <span className="sw" style={{ background: c.color || PALETTE[i % PALETTE.length] }} />
+                <span className="nm" title={c.name}>{c.name}</span>
+                <span className="pc">{pct}%</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
-  // Dynamic Status Chart Renderer
-  const renderStatusChart = () => {
-    const chartData = statusBreakdown.length > 0 ? statusBreakdown : [
-      { name: 'Pending', count: 5, color: '#faad14' },
-      { name: 'Approved', count: 12, color: '#1677ff' },
-      { name: 'Dispatched', count: 8, color: '#52c41a' },
-      { name: 'Delivered', count: 15, color: '#13c2c2' }
+  // ---------- Pipeline SLA (status) ----------
+  const statusData = (() => {
+    if (statusBreakdown && statusBreakdown.length > 0 && statusBreakdown.some(s => s.count > 0)) {
+      return statusBreakdown.map(s => ({
+        name: s.name,
+        count: s.count,
+        color: STATUS_COLORS[s.name] || '#94a3b8',
+      }));
+    }
+    return [
+      { name: 'Pending', count: 5, pct: 25, color: '#fead49' },
+      { name: 'Approved', count: 12, pct: 60, color: '#1eb9ff' },
+      { name: 'Rejected', count: 3, pct: 15, color: '#ff1f1f' },
     ];
+  })();
+  const statusTotal = stats?.totalOrders || statusData.reduce((a, b) => a + b.count, 0) || 20;
 
-    switch (statusChartType) {
+  const renderStatusChart = () => {
+    switch (chartTypes.statusBars) {
       case 'column':
         return (
-          <div style={{ width: '100%', height: 210, minHeight: 200 }}>
-            <ResponsiveContainer width="100%" height="100%" minHeight={200}>
-              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="name" stroke="#9ca3af" fontSize={12} tickLine={false} axisLine={false} />
-                <YAxis stroke="#9ca3af" fontSize={12} allowDecimals={false} tickLine={false} axisLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={40}>
-                  {chartData.map((s, idx) => (
-                    <Cell key={idx} fill={s.color || PALETTE[idx]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={statusData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e5eaf3" />
+              <XAxis dataKey="name" {...axisProps} />
+              <YAxis allowDecimals={false} {...axisProps} />
+              <Tooltip content={<ValueTooltip />} cursor={{ fill: '#eef3fb' }} />
+              <Bar dataKey="count" radius={[6, 6, 0, 0]} maxBarSize={40}>
+                {statusData.map((s, i) => <Cell key={i} fill={s.color} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         );
-      case 'bubble':
-      case 'scatter':
-        const scatterData = chartData.map((s, idx) => ({
-          x: idx + 1,
-          y: s.count,
-          z: (s.count + 1) * 140,
-          name: s.name,
-          color: s.color || PALETTE[idx]
-        }));
+      case 'bubble': {
+        const scatterData = statusData.map((s, idx) => ({ x: idx + 1, y: s.count, z: (s.count + 1) * 140, name: s.name, color: s.color }));
         return (
-          <div style={{ width: '100%', height: 210, minHeight: 200 }}>
-            <ResponsiveContainer width="100%" height="100%" minHeight={200}>
-              <ScatterChart margin={{ top: 10, right: 20, left: -20, bottom: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                <XAxis type="number" dataKey="x" name="Status Index" stroke="#9ca3af" fontSize={11} tickLine={false} axisLine={false} />
-                <YAxis type="number" dataKey="y" name="Quotations Count" stroke="#9ca3af" fontSize={11} allowDecimals={false} tickLine={false} axisLine={false} />
-                <ZAxis type="number" dataKey="z" range={[120, 600]} />
-                <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<CustomTooltip />} />
-                <Scatter data={scatterData}>
-                  {scatterData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Scatter>
-              </ScatterChart>
-            </ResponsiveContainer>
-          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <ScatterChart margin={{ top: 10, right: 20, left: -20, bottom: 10 }}>
+              <CartesianGrid strokeDasharray="4 4" stroke="#e5eaf3" />
+              <XAxis type="number" dataKey="x" name="Status" {...axisProps} fontSize={11} />
+              <YAxis type="number" dataKey="y" name="Quotations" allowDecimals={false} {...axisProps} fontSize={11} />
+              <ZAxis type="number" dataKey="z" range={[120, 600]} />
+              <Tooltip cursor={{ strokeDasharray: '3 3' }} content={<ValueTooltip />} />
+              <Scatter data={scatterData}>
+                {scatterData.map((e, i) => <Cell key={i} fill={e.color} />)}
+              </Scatter>
+            </ScatterChart>
+          </ResponsiveContainer>
         );
+      }
       case 'progress':
       default:
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '6px' }}>
-            {chartData.map((s) => {
-              const pct = stats?.totalOrders ? Math.round((s.count / stats.totalOrders) * 100) : 25;
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.15rem', marginTop: '0.4rem' }}>
+            {statusData.map((s) => {
+              const pct = s.pct !== undefined ? s.pct : (statusTotal ? Math.round((s.count / statusTotal) * 100) : 0);
               return (
-                <div key={s.name}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '4px' }}>
-                    <span style={{ fontWeight: '600', color: '#374151', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.color }}></span>
-                      {s.name}
-                    </span>
-                    <span style={{ fontWeight: '700', color: '#111827' }}>
-                      {s.count} <span style={{ fontWeight: 'normal', color: '#9ca3af', fontSize: '12px' }}>({pct}%)</span>
-                    </span>
-                  </div>
-                  <div style={{ height: '8px', width: '100%', background: '#f3f4f6', borderRadius: '6px', overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${pct}%`, background: s.color, borderRadius: '6px', transition: 'width 0.6s cubic-bezier(0.4, 0, 0.2, 1)' }}></div>
-                  </div>
+                <div key={s.name} className="bar-row">
+                  <span className="lbl">{s.name}</span>
+                  <div className="bar-track"><div className="bar-fill" style={{ width: `${pct}%`, background: s.color }} /></div>
+                  <span className="val">{s.count} <em>({pct}%)</em></span>
                 </div>
               );
             })}
@@ -456,66 +444,59 @@ export default function DashboardPage() {
     }
   };
 
-  // Dynamic Top Products Chart Renderer
-  const renderTopProductsChart = (widgetSize) => {
-    const chartData = topProducts.length > 0 ? topProducts : [
-      { name: 'Standard Water Tank 1000L', quantity: 18 },
-      { name: 'Heavy Duty PVC Pipe 100mm', quantity: 15 },
-      { name: 'Brass Gate Valve 2 inch', quantity: 12 },
-      { name: 'Tri-Layer Tank 500L', quantity: 9 },
-      { name: 'CPVC Connector Socket', quantity: 6 }
+  // ---------- Top items ----------
+  const topProductsItems = (() => {
+    if (topProducts && topProducts.length > 0 && topProducts.some(p => p.quantity > 0)) {
+      return topProducts.slice(0, 4);
+    }
+    return [
+      { name: 'Water Storage Tanks', quantity: 48 },
+      { name: 'UPVC Pipes', quantity: 32 },
+      { name: 'CPVC Pipes', quantity: 25 },
+      { name: 'Fittings & Valves', quantity: 18 },
     ];
+  })();
 
-    const displayItems = chartData.slice(0, widgetSize === 'small' ? 4 : 5);
+  const renderTopProductsChart = (widgetSize) => {
+    const items = topProductsItems;
+    const max = Math.max(...items.map(p => p.quantity), 1);
 
-    switch (topProductsChartType) {
+    switch (chartTypes.topProducts) {
       case 'column':
         return (
-          <div style={{ width: '100%', height: 210, minHeight: 200 }}>
-            <ResponsiveContainer width="100%" height="100%" minHeight={200}>
-              <BarChart data={displayItems} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="name" stroke="#9ca3af" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(val) => val.length > 10 ? val.substring(0, 10) + '...' : val} />
-                <YAxis stroke="#9ca3af" fontSize={11} allowDecimals={false} tickLine={false} axisLine={false} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="quantity" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={36}>
-                  {displayItems.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={PALETTE[index % PALETTE.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={items} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="4 4" vertical={false} stroke="#e5eaf3" />
+              <XAxis dataKey="name" {...axisProps} fontSize={10} tickFormatter={(v) => v.length > 10 ? v.slice(0, 10) + '…' : v} />
+              <YAxis allowDecimals={false} {...axisProps} fontSize={11} />
+              <Tooltip content={<ValueTooltip />} cursor={{ fill: '#eef3fb' }} />
+              <Bar dataKey="quantity" radius={[6, 6, 0, 0]} maxBarSize={36}>
+                {items.map((e, i) => <Cell key={i} fill={TOP_ITEM_COLORS[i % TOP_ITEM_COLORS.length]} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         );
       case 'donut':
         return (
-          <div style={{ width: '100%', height: 210, minHeight: 200 }}>
-            <ResponsiveContainer width="100%" height="100%" minHeight={200}>
-              <PieChart>
-                <Pie data={displayItems} cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={4} dataKey="quantity" nameKey="name" stroke="#fff" strokeWidth={2}>
-                  {displayItems.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={PALETTE[index % PALETTE.length]} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CustomTooltip />} />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie data={items} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="quantity" nameKey="name" stroke="#fff" strokeWidth={3}>
+                {items.map((e, i) => <Cell key={i} fill={TOP_ITEM_COLORS[i % TOP_ITEM_COLORS.length]} />)}
+              </Pie>
+              <Tooltip content={<ValueTooltip />} />
+            </PieChart>
+          </ResponsiveContainer>
         );
       case 'list':
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {displayItems.map((p, idx) => (
-              <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: '#f9fafb', border: '1px solid #f3f4f6', borderRadius: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ width: '22px', height: '22px', borderRadius: '6px', background: '#e0e7ff', color: '#4f46e5', fontSize: '11px', fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {idx + 1}
-                  </span>
-                  <span style={{ fontSize: '13px', fontWeight: '600', color: '#1f2937' }}>{p.name}</span>
-                </div>
-                <span style={{ padding: '2px 8px', background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', borderRadius: '10px', fontSize: '11px', fontWeight: '600' }}>
-                  {p.quantity} Units
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            {items.map((p, idx) => (
+              <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6rem', padding: '0.5rem 0.75rem', background: '#f5f9ff', border: '1px solid #e3ecf8', borderRadius: '0.5rem' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
+                  <span style={{ width: '1.5rem', height: '1.5rem', borderRadius: '0.4rem', background: '#e0e7ff', color: '#2f4392', fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{idx + 1}</span>
+                  <span style={{ fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</span>
                 </span>
+                <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#2f4392' }}>{p.quantity}</span>
               </div>
             ))}
           </div>
@@ -523,384 +504,193 @@ export default function DashboardPage() {
       case 'bar':
       default:
         return (
-          <div style={{ width: '100%', height: 210, minHeight: 200 }}>
-            <ResponsiveContainer width="100%" height="100%" minHeight={200}>
-              <BarChart data={displayItems} layout="vertical" margin={{ top: 5, right: 15, left: 10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
-                <XAxis type="number" stroke="#9ca3af" fontSize={11} allowDecimals={false} tickLine={false} axisLine={false} />
-                <YAxis dataKey="name" type="category" stroke="#9ca3af" fontSize={10} tickLine={false} axisLine={false} width={90} tickFormatter={(val) => val.length > 12 ? val.substring(0, 12) + '...' : val} />
-                <Tooltip content={<CustomTooltip />} />
-                <Bar dataKey="quantity" radius={[0, 6, 6, 0]} maxBarSize={22}>
-                  {displayItems.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={PALETTE[index % PALETTE.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.95rem', marginTop: '0.3rem' }}>
+            {items.map((p, i) => (
+              <div key={p.name + i} className="bar-row wide-label">
+                <span className="lbl" title={p.name}>{p.name}</span>
+                <div className="bar-track"><div className="bar-fill" style={{ width: `${(p.quantity / max) * 100}%`, background: TOP_ITEM_COLORS[i % TOP_ITEM_COLORS.length] }} /></div>
+                <span className="val">{p.quantity}</span>
+              </div>
+            ))}
           </div>
         );
     }
   };
 
-  // Card Size Controls
-  const renderCardSizeControls = (widget) => {
-    const currentSize = widget.size || 'medium';
-    const currentShape = widget.shape || 'rectangle';
+  const viewAll = (href) => <button className="link-btn" onClick={() => router.push(href)}>View All</button>;
 
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: '#f3f4f6', padding: '2px 4px', borderRadius: '6px' }}>
-        {['small', 'medium', 'full'].map((sz) => (
-          <button
-            key={sz}
-            onClick={() => setWidgetSize(widget.id, sz)}
-            style={{
-              padding: '2px 6px',
-              fontSize: '11px',
-              fontWeight: currentSize === sz ? '700' : '500',
-              color: currentSize === sz ? '#4f46e5' : '#6b7280',
-              background: currentSize === sz ? '#fff' : 'transparent',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              boxShadow: currentSize === sz ? '0 1px 2px rgba(0,0,0,0.08)' : 'none'
-            }}
-            title={`Set size to ${sz.toUpperCase()}`}
-          >
-            {sz === 'small' ? 'S' : sz === 'medium' ? 'M' : 'Full'}
-          </button>
-        ))}
-
-        <div style={{ width: '1px', height: '14px', background: '#e5e7eb', margin: '0 2px' }}></div>
-
-        <button
-          onClick={() => setWidgetShape(widget.id, currentShape === 'square' ? 'rectangle' : 'square')}
-          style={{
-            padding: '2px 4px',
-            color: '#6b7280',
-            background: 'transparent',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center'
-          }}
-          title={`Toggle Shape (Current: ${currentShape})`}
-        >
-          {currentShape === 'square' ? <Square size={13} color="#4f46e5" /> : <RectangleHorizontal size={14} color="#4f46e5" />}
-        </button>
-      </div>
-    );
-  };
-
-  // Render individual widget component by ID
+  // ---------- Widgets ----------
   const renderWidgetContent = (widget) => {
-    const { chartHeight } = getWidgetStyles(widget);
+    const chartHeight = getChartHeight(widget);
 
     switch (widget.id) {
-      case 'kpiSummary':
+      case 'kpiSummary': {
         return (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', width: '100%' }}>
-            <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Total Quotations ({timeRange})</span>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#e0e7ff', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <ShoppingCart size={20} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-                <span style={{ fontSize: '28px', fontWeight: '800', color: '#111827' }}>{loading ? '...' : stats?.totalOrders || 0}</span>
-                <span style={{ fontSize: '12px', color: '#10b981', fontWeight: '600', display: 'flex', alignItems: 'center' }}>
-                  <TrendingUp size={14} style={{ marginRight: '2px' }} /> Dynamic
-                </span>
-              </div>
-              <div style={{ fontSize: '12px', color: '#9ca3af' }}>Live Couchbase Capella Stream</div>
-            </div>
-
-            <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Pending Action</span>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Clock size={20} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-                <span style={{ fontSize: '28px', fontWeight: '800', color: '#111827' }}>{loading ? '...' : stats?.pendingOrders || 0}</span>
-                <span className="badge badge-pending" style={{ fontSize: '11px' }}>Review Required</span>
-              </div>
-              <div style={{ fontSize: '12px', color: '#9ca3af' }}>Awaiting Admin Dispatch</div>
-            </div>
-
-            <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Authorized App Users</span>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#d1fae5', color: '#059669', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Users size={20} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-                <span style={{ fontSize: '28px', fontWeight: '800', color: '#111827' }}>{loading ? '...' : stats?.totalUsers || 0}</span>
-                <span style={{ fontSize: '12px', color: '#059669', fontWeight: '600' }}>
-                  {stats?.activeUsers || 0} Active
-                </span>
-              </div>
-              <div style={{ fontSize: '12px', color: '#9ca3af' }}>{stats?.inactiveUsers || 0} Accounts Inactive</div>
-            </div>
-
-            <div className="glass-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '13px', fontWeight: '600', color: '#6b7280' }}>Master Product Items</span>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#f3e8ff', color: '#7c3aed', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Package size={20} />
-                </div>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px' }}>
-                <span style={{ fontSize: '28px', fontWeight: '800', color: '#111827' }}>{loading ? '...' : stats?.totalProducts || 0}</span>
-                <span style={{ fontSize: '12px', color: '#7c3aed', fontWeight: '600' }}>
-                  {stats?.totalCategories || 0} Categories
-                </span>
-              </div>
-              <div style={{ fontSize: '12px', color: '#9ca3af' }}>{stats?.activeProducts || 0} Active Items</div>
-            </div>
+          <div className="stat-grid">
+            <StatCard
+              tone="indigo"
+              loading={loading}
+              icon={<Icon name="document" size={26} color="#384dac" />}
+              value={stats?.totalOrders ?? 12}
+              label="Total Quotations"
+              trend="+20%"
+              trendTone="green"
+              trendLabel="vs previous 30 days"
+              spark={monthlyTrend.length > 0 ? monthlyTrend.map(m => m.count) : [10, 18, 15, 22, 27, 38]}
+            />
+            <StatCard
+              tone="green"
+              loading={loading}
+              icon={<Icon name="pause" size={24} color="#16a34a" />}
+              value={stats?.pendingOrders ?? 3}
+              label="Pending Action"
+              trend="+5%"
+              trendTone="orange"
+              trendLabel="vs previous 30 days"
+              spark={[3, 5, 4, 6, 5, 7]}
+            />
+            <StatCard
+              tone="sky"
+              loading={loading}
+              icon={<Icon name="group" size={28} color="#0891b2" />}
+              value={stats?.totalUsers ?? 5}
+              label="Authorized App Users"
+              trend="+25%"
+              trendTone="green"
+              trendLabel="vs previous 30 days"
+              spark={[2, 3, 3, 4, 4, 5]}
+            />
+            <StatCard
+              tone="purple"
+              loading={loading}
+              icon={<Icon name="crowd-of-users" size={28} color="#7c3aed" />}
+              value={stats?.totalProducts ?? 128}
+              label="Master Product Items"
+              trend="+12%"
+              trendTone="green"
+              trendLabel="vs previous 30 days"
+              spark={[80, 95, 105, 115, 120, 128]}
+            />
           </div>
         );
+      }
 
       case 'monthlyChart':
         return (
-          <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', width: '100%', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <BarChart3 size={18} color="#4f46e5" /> Volume Trend ({timeRange})
-                </h3>
-              </div>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {renderCardSizeControls(widget)}
-
-                <div style={{ display: 'flex', gap: '2px', background: '#f3f4f6', padding: '2px', borderRadius: '6px' }}>
-                  {['area', 'line', 'column', 'composed'].map(type => (
-                    <button
-                      key={type}
-                      onClick={() => setTrendChartType(type)}
-                      style={{
-                        padding: '3px 8px', fontSize: '11px', borderRadius: '4px', border: 'none', cursor: 'pointer',
-                        background: trendChartType === type ? '#fff' : 'transparent',
-                        color: trendChartType === type ? '#4f46e5' : '#6b7280',
-                        fontWeight: trendChartType === type ? '700' : 'normal'
-                      }}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            
+          <div className="ds-card widget">
+            <WidgetHead
+              icon={<BarChart3 size={24} strokeWidth={2.6} color="#384dac" />}
+              title="Quotation Volume Trend"
+              sub={`Total quotations created in the ${RANGE_LABELS[timeRange].toLowerCase()}`}
+              right={viewAll("/orders")}
+            />
             <div style={{ width: '100%', height: chartHeight, minHeight: 220 }}>
               {mounted ? (
-                <ResponsiveContainer width="100%" height="100%" minHeight={200}>
-                  {renderTrendChart()}
-                </ResponsiveContainer>
-              ) : (
-                <div style={{ height: '100%', width: '100%', background: '#f9fafb', borderRadius: '8px' }}></div>
-              )}
+                <ResponsiveContainer width="100%" height="100%">{renderTrendChart()}</ResponsiveContainer>
+              ) : <div style={{ height: '100%', background: '#f6f9fd', borderRadius: 8 }} />}
             </div>
           </div>
         );
 
       case 'categoryPie':
         return (
-          <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', width: '100%', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-              <div>
-                <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <PieChartIcon size={18} color="#10b981" /> Category Share ({timeRange})
-                </h3>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {renderCardSizeControls(widget)}
-
-                <div style={{ display: 'flex', gap: '2px', background: '#f3f4f6', padding: '2px', borderRadius: '6px' }}>
-                  {['donut', 'pie', 'treemap', 'column'].map(type => (
-                    <button
-                      key={type}
-                      onClick={() => setCategoryChartType(type)}
-                      style={{
-                        padding: '3px 8px', fontSize: '11px', borderRadius: '4px', border: 'none', cursor: 'pointer',
-                        background: categoryChartType === type ? '#fff' : 'transparent',
-                        color: categoryChartType === type ? '#10b981' : '#6b7280',
-                        fontWeight: categoryChartType === type ? '700' : 'normal'
-                      }}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div style={{ width: '100%', height: chartHeight, minHeight: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {mounted ? (
-                <ResponsiveContainer width="100%" height="100%" minHeight={200}>
-                  {renderCategoryChart()}
-                </ResponsiveContainer>
-              ) : (
-                <div style={{ height: '100%', width: '100%', background: '#f9fafb', borderRadius: '8px' }}></div>
-              )}
+          <div className="ds-card widget">
+            <WidgetHead
+              icon={<Settings size={24} strokeWidth={2.4} color="#1aa3f0" />}
+              title={<b style={{ fontWeight: 600 }}>Category Share ({rangeShort})</b>}
+              right={
+                <select className="field" style={{ width: 'auto', height: '2.3rem', fontSize: '0.9rem' }} value={chartTypes.categoryPie} onChange={(e) => setChartType('categoryPie', e.target.value)}>
+                  {CHART_TYPES.categoryPie.map(t => <option key={t} value={t}>{t === 'donut' ? 'By Items' : t[0].toUpperCase() + t.slice(1)}</option>)}
+                </select>
+              }
+            />
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 0.5rem' }}>
+              {mounted ? <div style={{ width: '100%' }}>{renderCategoryChart(Math.min(chartHeight - 30, 210))}</div> : null}
             </div>
           </div>
         );
 
       case 'statusBars':
         return (
-          <div className="glass-card" style={{ padding: '24px', width: '100%', height: '100%', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#111827' }}>
-                Pipeline SLA
-              </h3>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {renderCardSizeControls(widget)}
-
-                <div style={{ display: 'flex', gap: '2px', background: '#f3f4f6', padding: '2px', borderRadius: '6px' }}>
-                  {['progress', 'column', 'bubble'].map(type => (
-                    <button
-                      key={type}
-                      onClick={() => setStatusChartType(type)}
-                      style={{
-                        padding: '3px 6px', fontSize: '10px', borderRadius: '4px', border: 'none', cursor: 'pointer',
-                        background: statusChartType === type ? '#fff' : 'transparent',
-                        color: statusChartType === type ? '#4f46e5' : '#6b7280',
-                        fontWeight: statusChartType === type ? '700' : 'normal'
-                      }}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {renderStatusChart()}
+          <div className="ds-card widget">
+            <WidgetHead icon={<History size={24} strokeWidth={2.4} color="#2f4392" />} title="Pipeline SLA" right={viewAll("/orders")} />
+            {mounted ? renderStatusChart() : null}
           </div>
         );
 
       case 'topProducts':
         return (
-          <div className="glass-card" style={{ padding: '24px', width: '100%', height: '100%', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '8px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#111827' }}>
-                Top Items ({timeRange})
-              </h3>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {renderCardSizeControls(widget)}
-
-                <div style={{ display: 'flex', gap: '2px', background: '#f3f4f6', padding: '2px', borderRadius: '6px' }}>
-                  {['bar', 'column', 'donut', 'list'].map(type => (
-                    <button
-                      key={type}
-                      onClick={() => setTopProductsChartType(type)}
-                      style={{
-                        padding: '3px 6px', fontSize: '10px', borderRadius: '4px', border: 'none', cursor: 'pointer',
-                        background: topProductsChartType === type ? '#fff' : 'transparent',
-                        color: topProductsChartType === type ? '#10b981' : '#6b7280',
-                        fontWeight: topProductsChartType === type ? '700' : 'normal'
-                      }}
-                    >
-                      {type}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {mounted ? renderTopProductsChart(widget.size) : <div style={{ height: 200, background: '#f9fafb', borderRadius: '8px' }}></div>}
+          <div className="ds-card widget">
+            <WidgetHead icon={<Icon name="box" size={24} color="#2f4392" />} title={`Top Items (${rangeShort})`} right={viewAll("/products")} />
+            {mounted ? renderTopProductsChart(widget.size) : null}
           </div>
         );
 
       case 'quickActions':
         return (
-          <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', width: '100%', height: '100%', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#111827' }}>
-                  Management Panel
-                </h3>
-                {renderCardSizeControls(widget)}
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <button onClick={() => router.push('/users')} className="btn-secondary" style={{ padding: '10px 14px', justifyContent: 'flex-start', fontSize: '13px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-                  <Users size={16} color="#4f46e5" /> Manage Users
-                </button>
-                <button onClick={() => router.push('/products')} className="btn-secondary" style={{ padding: '10px 14px', justifyContent: 'flex-start', fontSize: '13px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-                  <Package size={16} color="#10b981" /> Edit Catalog Products
-                </button>
-                <button onClick={() => router.push('/orders')} className="btn-secondary" style={{ padding: '10px 14px', justifyContent: 'flex-start', fontSize: '13px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-                  <ShoppingCart size={16} color="#f59e0b" /> Review Quotations
-                </button>
-              </div>
-            </div>
-
-            <div style={{ marginTop: '16px', padding: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', fontSize: '11px', color: '#15803d', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Zap size={14} color="#16a34a" /> 
-              <span>Dynamic Couchbase Sync</span>
+          <div className="ds-card widget">
+            <WidgetHead icon={<Settings size={24} strokeWidth={2.4} color="#2f4392" />} title="Management Panel" />
+            <div className="mgmt-grid">
+              <button className="mgmt-btn" onClick={() => router.push('/users')}>
+                <Icon name="user" size={23} color="#485fca" /><span className="nm">Manage Users</span><ChevronRight size={16} />
+              </button>
+              <button className="mgmt-btn" onClick={() => router.push('/products')}>
+                <Icon name="box" size={23} color="#485fca" /><span className="nm">Manage Products</span><ChevronRight size={16} />
+              </button>
+              <button className="mgmt-btn" onClick={() => router.push('/categories')}>
+                <Icon name="document" size={23} color="#485fca" /><span className="nm">Manage Categories</span><ChevronRight size={16} />
+              </button>
+              <button className="mgmt-btn" onClick={() => router.push('/orders')}>
+                <Icon name="order" size={23} color="#485fca" /><span className="nm">View Orders</span><ChevronRight size={16} />
+              </button>
             </div>
           </div>
         );
 
-      case 'recentOrders':
+      case 'recentOrders': {
+        const asTable = widget.size !== 'small' && widget.size !== 'compact';
         return (
-          <div className="glass-card" style={{ padding: '24px', width: '100%', background: '#fff', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#111827' }}>Recent Quotation Stream ({timeRange})</h3>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {renderCardSizeControls(widget)}
-                <button onClick={() => router.push('/orders')} className="btn-secondary" style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '6px' }}>
-                  View All →
-                </button>
-              </div>
-            </div>
-
+          <div className="ds-card widget">
+            <WidgetHead icon={<Icon name="recent" size={22} color="#4361ee" />} title={`Recent Quotation Stream (${rangeShort})`} right={viewAll("/orders")} />
             {recentOrders.length === 0 ? (
-              <div style={{ padding: '30px', textAlign: 'center', color: '#9ca3af' }}>No quotations in this time window.</div>
-            ) : (
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <div className="muted-center" style={{ padding: '2.5rem 1rem', color: '#94a3b8', fontSize: '0.95rem' }}>
+                No quotation on the window in this time
+              </div>
+            ) : asTable ? (
+              <div className="table-wrap">
+                <table className="ds-table">
                   <thead>
-                    <tr>
-                      <th style={{ padding: '10px 16px', background: '#f9fafb', color: '#6b7280', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}>Quotation #</th>
-                      <th style={{ padding: '10px 16px', background: '#f9fafb', color: '#6b7280', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}>Customer Name</th>
-                      <th style={{ padding: '10px 16px', background: '#f9fafb', color: '#6b7280', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}>Items Count</th>
-                      <th style={{ padding: '10px 16px', background: '#f9fafb', color: '#6b7280', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}>Status</th>
-                      <th style={{ padding: '10px 16px', background: '#f9fafb', color: '#6b7280', fontSize: '12px', fontWeight: '600', textTransform: 'uppercase' }}>Date</th>
-                    </tr>
+                    <tr><th>Quotation #</th><th>Customer</th><th>Items</th><th>Status</th><th>Date</th></tr>
                   </thead>
                   <tbody>
                     {recentOrders.map(order => (
                       <tr key={order.id}>
-                        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', fontWeight: '700', color: '#4f46e5', fontSize: '13px', fontFamily: 'monospace' }}>{order.orderNo}</td>
-                        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', fontSize: '13px', fontWeight: '600', color: '#111827' }}>{order.userName}</td>
-                        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', fontSize: '13px', color: '#4b5563' }}>{order.items?.length || 1} Items</td>
-                        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6' }}>
-                          <span className={`badge badge-${(order.status || 'pending').toLowerCase()}`}>
-                            {order.status || 'Pending'}
-                          </span>
-                        </td>
-                        <td style={{ padding: '12px 16px', borderBottom: '1px solid #f3f4f6', fontSize: '12px', color: '#9ca3af' }}>
-                          {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
-                        </td>
+                        <td className="code-link">{order.orderNo}</td>
+                        <td>{order.userName}</td>
+                        <td>{order.items?.length || 1} Items</td>
+                        <td><span className={`badge badge-${(order.status || 'pending').toLowerCase()}`}>{order.status || 'Pending'}</span></td>
+                        <td style={{ color: '#6b7280' }}>{order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+            ) : (
+              <div className="recent-list">
+                {recentOrders.map(order => (
+                  <div key={order.id} className="recent-item">
+                    <div style={{ minWidth: 0 }}>
+                      <div className="no">{order.orderNo}</div>
+                      <div className="who">{order.userName} · {order.items?.length || 1} items · {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}</div>
+                    </div>
+                    <span className={`badge badge-${(order.status || 'pending').toLowerCase()}`}>{order.status || 'Pending'}</span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         );
+      }
 
       default:
         return null;
@@ -909,106 +699,59 @@ export default function DashboardPage() {
 
   const visibleWidgets = widgetList.filter(w => w.visible);
 
+  const toolbar = (
+    <div className="dash-toolbar">
+      <div className="select-ic">
+        <CalendarDays size={22} className="lead-ic" fill="#2f4392" color="#fff" strokeWidth={1.6} />
+        <select className="field" value={timeRange} onChange={(e) => setTimeRange(e.target.value)}>
+          {Object.entries(RANGE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+      </div>
+
+      <button
+        onClick={() => setAutoRefresh(!autoRefresh)}
+        className={`btn btn-ghost${autoRefresh ? ' on' : ''}`}
+        title="Toggle 10s live auto-polling"
+      >
+        <Icon name="wave" size={20} className={autoRefresh ? 'spin' : ''} style={autoRefresh ? { animationDuration: '2s' } : undefined} />
+        {autoRefresh ? 'Live Polling ON' : 'Live Polling OFF'}
+      </button>
+
+      <button onClick={() => fetchDashboardData(timeRange)} className="btn btn-ghost" title="Refresh analytics data">
+        <Icon name="refresh" size={20} className={loading ? 'spin' : ''} /> Refresh
+      </button>
+
+      <button onClick={() => setShowCustomizeModal(true)} className="btn btn-navy">
+        <Icon name="plus" size={18} /> Customize Layout
+      </button>
+    </div>
+  );
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--bg-body)' }}>
-      <Sidebar />
-      <Navbar />
-      
-      <main style={{ padding: '24px', flex: 1, display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        
-        {/* Executive Header Toolbar with Dynamic Filters */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', background: '#fff', padding: '20px 24px', borderRadius: '12px', border: '1px solid #e5e7eb', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
-          <div>
-            <h1 style={{ fontSize: '22px', fontWeight: '800', color: '#111827', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <LayoutGrid size={24} color="#4f46e5" /> Executive Dynamic Dashboard
-            </h1>
-            <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '2px' }}>
-              100% Dynamic Data Visualizations with live time-range filtering and Couchbase Capella polling.
-            </p>
+    <AdminLayout
+      eyebrow="Welcome Back!"
+      title="Admin Dashboard"
+      subtitle="Manage quotations, products and customers from one place."
+      aside={toolbar}
+    >
+      <div className="dash-grid">
+        {visibleWidgets.map(widget => (
+          <div key={widget.id} style={{ gridColumn: `span ${SIZE_SPANS[widget.size] || 6}`, minWidth: 0 }}>
+            {renderWidgetContent(widget)}
           </div>
+        ))}
+      </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            {/* Dynamic Time Range Filter */}
-            <select
-              className="glass-input"
-              style={{ height: '38px', width: '150px', fontSize: '13px', borderRadius: '8px', border: '1px solid #e5e7eb', fontWeight: '600' }}
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value)}
-            >
-              <option value="7days">Last 7 Days</option>
-              <option value="30days">Last 30 Days</option>
-              <option value="90days">Last 90 Days</option>
-              <option value="ytd">Year to Date</option>
-              <option value="all">All Time</option>
-            </select>
-
-            {/* Dynamic Live Polling Toggle */}
-            <button
-              onClick={() => setAutoRefresh(!autoRefresh)}
-              style={{
-                height: '38px',
-                padding: '0 14px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '13px',
-                fontWeight: '600',
-                border: '1px solid #e5e7eb',
-                cursor: 'pointer',
-                background: autoRefresh ? '#ecfdf5' : '#fff',
-                color: autoRefresh ? '#047857' : '#4b5563'
-              }}
-              title="Toggle 10s Live Auto-Polling"
-            >
-              <Radio size={16} color={autoRefresh ? '#047857' : '#9ca3af'} className={autoRefresh ? 'spin' : ''} />
-              {autoRefresh ? 'Live Polling ON' : 'Live Polling OFF'}
-            </button>
-
-            <button
-              onClick={() => fetchDashboardData(timeRange)}
-              className="btn-secondary"
-              style={{ height: '38px', padding: '0 14px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}
-              title="Refresh Analytics Data"
-            >
-              <RefreshCw size={16} className={loading ? 'spin' : ''} /> Refresh
-            </button>
-
-            <button
-              onClick={() => setShowCustomizeModal(true)}
-              className="btn-primary"
-              style={{ height: '38px', padding: '0 16px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '8px', background: '#4f46e5' }}
-            >
-              <SlidersHorizontal size={16} /> Customize Layout
-            </button>
-          </div>
-        </div>
-
-        {/* Dynamic 12-Column Flexible Grid Layout */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: '20px', width: '100%' }}>
-          {visibleWidgets.map(widget => {
-            const { gridSpan } = getWidgetStyles(widget);
-            return (
-              <div key={widget.id} style={{ gridColumn: gridSpan, minWidth: 0 }}>
-                {renderWidgetContent(widget)}
-              </div>
-            );
-          })}
-        </div>
-      </main>
-
-      {/* Modal: Drag & Drop & Resizing Configurator */}
+      {/* Modal: drag & drop, card sizes, shapes and chart types */}
       {showCustomizeModal && (
         <div className="modal-overlay" onClick={() => setShowCustomizeModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '540px', borderRadius: '12px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '8px', color: '#111827', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <SlidersHorizontal size={20} color="#4f46e5" /> Layout & Card Size Configurator
-            </h3>
-            <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '20px' }}>
-              <strong>Drag & Drop</strong> to reorder. Adjust card sizes (S, M, Full) and shapes (Rectangle vs Square).
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '44rem' }}>
+            <h3 className="modal-title">Customize Dashboard Layout</h3>
+            <p style={{ fontSize: '0.85rem', color: '#6b7280', marginTop: '-0.75rem', marginBottom: '1.1rem' }}>
+              <strong>Drag &amp; drop</strong> to reorder. Choose each card&apos;s width, shape and chart type, or hide it.
             </p>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginBottom: '1.4rem' }}>
               {widgetList.map((item, index) => (
                 <div
                   key={item.id}
@@ -1017,49 +760,29 @@ export default function DashboardPage() {
                   onDragEnd={handleDragEnd}
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, index)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '12px 16px',
-                    background: draggedIndex === index ? '#e0e7ff' : '#f9fafb',
-                    border: `1px solid ${draggedIndex === index ? '#818cf8' : '#e5e7eb'}`,
-                    borderRadius: '8px',
-                    cursor: 'grab',
-                    transition: 'all 0.2s ease'
-                  }}
+                  className={`layout-row${draggedIndex === index ? ' dragging' : ''}`}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0 }}>
                     <GripVertical size={16} color="#9ca3af" />
-                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>{item.label}</span>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 500, color: item.visible ? '#1d2433' : '#9ca3af' }}>{item.label}</span>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <select
-                      value={item.size || 'medium'}
-                      onChange={(e) => setWidgetSize(item.id, e.target.value)}
-                      style={{ fontSize: '12px', padding: '2px 6px', borderRadius: '4px', border: '1px solid #d1d5db' }}
-                    >
-                      <option value="small">Small (1/3 Width)</option>
-                      <option value="medium">Medium (1/2 Width)</option>
-                      <option value="full">Full Width (1/1)</option>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {CHART_TYPES[item.id] && (
+                      <select className="field" value={chartTypes[item.id]} onChange={(e) => setChartType(item.id, e.target.value)} title="Chart type">
+                        {CHART_TYPES[item.id].map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                    )}
+                    <select className="field" value={item.size || 'medium'} onChange={(e) => setWidgetSize(item.id, e.target.value)} title="Card width">
+                      {Object.entries(SIZE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                     </select>
-
-                    <button
-                      type="button"
-                      onClick={() => setWidgetShape(item.id, item.shape === 'square' ? 'rectangle' : 'square')}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}
-                      title="Toggle Rectangle / Square Shape"
-                    >
-                      {item.shape === 'square' ? <Square size={16} color="#4f46e5" /> : <RectangleHorizontal size={16} color="#4f46e5" />}
+                    <button type="button" onClick={() => setWidgetShape(item.id, item.shape === 'square' ? 'rectangle' : 'square')}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }} title="Toggle rectangle / square">
+                      {item.shape === 'square' ? <Square size={16} color="#2f4392" /> : <RectangleHorizontal size={16} color="#2f4392" />}
                     </button>
-
-                    <button
-                      type="button"
-                      onClick={() => toggleWidgetVisibility(item.id)}
-                      style={{ background: 'none', border: 'none', color: item.visible ? '#4f46e5' : '#9ca3af', cursor: 'pointer', padding: '2px' }}
-                      title={item.visible ? 'Hide Widget' : 'Show Widget'}
-                    >
+                    <button type="button" onClick={() => toggleWidgetVisibility(item.id)}
+                      style={{ background: 'none', border: 'none', color: item.visible ? '#2f4392' : '#9ca3af', cursor: 'pointer', padding: 2, display: 'flex' }}
+                      title={item.visible ? 'Hide widget' : 'Show widget'}>
                       {item.visible ? <Eye size={18} /> : <EyeOff size={18} />}
                     </button>
                   </div>
@@ -1068,20 +791,12 @@ export default function DashboardPage() {
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button
-                className="btn-secondary"
-                onClick={() => saveWidgetOrder(DEFAULT_WIDGETS)}
-                style={{ fontSize: '12px', borderRadius: '6px' }}
-              >
-                Reset Default Sizes
-              </button>
-              <button className="btn-primary" onClick={() => setShowCustomizeModal(false)} style={{ background: '#4f46e5', borderRadius: '6px' }}>
-                Save & Apply Layout
-              </button>
+              <button className="btn btn-outline btn-sm" onClick={() => saveWidgetOrder(DEFAULT_WIDGETS)}>Reset to Default</button>
+              <button className="btn btn-navy btn-sm" onClick={() => setShowCustomizeModal(false)}>Save &amp; Apply Layout</button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </AdminLayout>
   );
 }

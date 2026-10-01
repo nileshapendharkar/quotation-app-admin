@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import Sidebar from '@/components/Sidebar';
-import Navbar from '@/components/Navbar';
+import AdminLayout from '@/components/AdminLayout';
 import { Bell, Send } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
@@ -44,78 +43,61 @@ export default function NotificationsPage() {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--bg-body)' }}>
-      <Sidebar />
-      <Navbar title="Notification System" />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-
-        <main style={{ padding: '32px', flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
-          {/* Send Broadcast Box */}
-          <div className="glass-card" style={{ padding: '24px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '20px', color: '#f8fafc', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Bell color="#38bdf8" /> Send Notification Update
-            </h3>
-
-            <form onSubmit={handleSend} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Notification Title</label>
-                <input
-                  type="text"
-                  className="glass-input"
-                  placeholder="e.g. Catalog Update: New Safety Helmets"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Message</label>
-                <textarea
-                  className="glass-input"
-                  rows={4}
-                  placeholder="Details about product catalog updates or order processing times..."
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Target Audience</label>
-                <select className="glass-input" value={targetUser} onChange={(e) => setTargetUser(e.target.value)}>
-                  <option value="all" style={{ background: '#0f172a' }}>All Registered Customers</option>
-                </select>
-              </div>
-
-              <button type="submit" className="btn-primary" disabled={submitting} style={{ marginTop: '10px', justifyContent: 'center' }}>
-                {submitting ? 'Broadcasting...' : (
-                  <>Send Broadcast <Send size={16} /></>
-                )}
-              </button>
-            </form>
+    <AdminLayout
+      title="Notifications"
+      subtitle="Send updates to every registered customer of the mobile app."
+      breadcrumb={['Notifications']}
+    >
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(22rem, 1fr))', gap: '1.25rem' }}>
+        {/* Send broadcast */}
+        <div className="ds-card widget">
+          <div className="card-head">
+            <span className="card-head-ic"><Bell size={22} color="#2f4392" /></span>
+            <div className="card-head-text"><div className="card-title">Send Notification Update</div></div>
           </div>
 
-          {/* History */}
-          <div className="glass-card" style={{ padding: '24px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '20px', color: '#f8fafc' }}>
-              Notification Log
-            </h3>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '500px', overflowY: 'auto' }}>
-              {notifications.map(n => (
-                <div key={n.id} style={{ padding: '16px', borderRadius: '12px', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-glass)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <strong style={{ fontSize: '14px', color: '#38bdf8' }}>{n.title}</strong>
-                    <span style={{ fontSize: '11px', color: '#64748b' }}>{new Date(n.createdAt).toLocaleTimeString()}</span>
-                  </div>
-                  <p style={{ fontSize: '13px', color: '#cbd5e1' }}>{n.message}</p>
-                </div>
-              ))}
+          <form onSubmit={handleSend} className="modal-form">
+            <div>
+              <label className="form-label">Notification Title</label>
+              <input type="text" className="field" placeholder="e.g. Catalog Update: New Water Tanks" value={title} onChange={(e) => setTitle(e.target.value)} required />
             </div>
+            <div>
+              <label className="form-label">Message</label>
+              <textarea className="field" rows={4} placeholder="Details about product catalog updates or order processing times..." value={message} onChange={(e) => setMessage(e.target.value)} required />
+            </div>
+            <div>
+              <label className="form-label">Target Audience</label>
+              <select className="field" value={targetUser} onChange={(e) => setTargetUser(e.target.value)}>
+                <option value="all">All Registered Customers</option>
+              </select>
+            </div>
+            <button type="submit" className="btn btn-primary" disabled={submitting} style={{ marginTop: '0.4rem' }}>
+              {submitting ? 'Broadcasting...' : (<>Send Broadcast <Send size={16} /></>)}
+            </button>
+          </form>
+        </div>
+
+        {/* History */}
+        <div className="ds-card widget">
+          <div className="card-head">
+            <span className="card-head-ic"><Send size={20} color="#2f4392" /></span>
+            <div className="card-head-text"><div className="card-title">Notification Log</div></div>
           </div>
-        </main>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', maxHeight: '32rem', overflowY: 'auto' }}>
+            {notifications.length === 0 && <div className="muted-center">No notifications sent yet</div>}
+            {notifications.map(n => (
+              <div key={n.id} style={{ padding: '0.9rem 1rem', borderRadius: '0.75rem', background: '#f8fbff', border: '1px solid #e3ecf8' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', marginBottom: '0.3rem' }}>
+                  <strong style={{ fontSize: '0.92rem', color: '#2f4392', fontWeight: 600 }}>{n.title}</strong>
+                  <span style={{ fontSize: '0.72rem', color: '#8a94a6', whiteSpace: 'nowrap' }}>{new Date(n.createdAt).toLocaleString()}</span>
+                </div>
+                <p style={{ fontSize: '0.85rem', color: '#4a5568' }}>{n.message}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-    </div>
+    </AdminLayout>
   );
 }

@@ -1,9 +1,28 @@
 'use client';
 import { useEffect, useState } from 'react';
-import Sidebar from '@/components/Sidebar';
-import Navbar from '@/components/Navbar';
-import { Plus, Search, Edit, Trash2, Filter, Settings2, GripVertical, Eye, EyeOff, ToggleLeft, ToggleRight, Package, Tag, Hash } from 'lucide-react';
+import AdminLayout from '@/components/AdminLayout';
+import Icon from '@/components/Icon';
+import { Pagination, EmptyState, getUrlQuery } from '@/components/ui';
+import { Search, GripVertical, Eye, EyeOff } from 'lucide-react';
 import { apiFetch, getImageUrl } from '@/lib/api';
+
+// Header labels as shown in the design (saved column settings keep their order/visibility,
+// but always use these labels)
+const COLUMN_LABELS = {
+  code: 'General Product Code',
+  productCode: 'Size Product Code',
+  name: 'Product Name',
+  category: 'Category',
+  uom: 'UOM',
+  sizes: 'Sizes',
+  packing: 'Packing',
+  status: 'Status - Active/Inactive',
+  image: 'Image',
+  description: 'Description',
+  details: 'Details',
+  specification: 'Specification',
+  actions: 'Actions',
+};
 
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
@@ -11,8 +30,10 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
-  // Exact complete column list requested by user
+  // Complete column list
   const [columns, setColumns] = useState([
     { id: 'code', label: 'General ProductCode', visible: true },
     { id: 'productCode', label: 'Size ProductCode', visible: true },
@@ -48,7 +69,10 @@ export default function ProductsPage() {
 
   useEffect(() => {
     fetchCategories();
-    fetchProducts();
+    // ?q= comes from the global header search
+    const q = getUrlQuery('q');
+    if (q) setSearch(q);
+    fetchProducts(true, q);
     const savedCols = localStorage.getItem('nocobase_product_cols_v3');
     if (savedCols) {
       try {
@@ -75,15 +99,15 @@ export default function ProductsPage() {
     if (res.success) setCategories(res.categories || []);
   };
 
-  const fetchProducts = async (showLoading = true) => {
+  const fetchProducts = async (showLoading = true, searchTerm = search) => {
     if (showLoading) setLoading(true);
     let url = '/products?includeInactive=true&';
-    if (search) url += `search=${encodeURIComponent(search)}&`;
+    if (searchTerm) url += `search=${encodeURIComponent(searchTerm)}&`;
     if (selectedCategory) url += `categoryId=${selectedCategory}&`;
 
     const res = await apiFetch(url);
     if (res.success) setProducts(res.products || []);
-    if (showLoading) setLoading(false);
+    if (showLoading) { setLoading(false); setPage(1); }
   };
 
   const openAddModal = () => {
@@ -104,13 +128,13 @@ export default function ProductsPage() {
 
   const openEditModal = (prod) => {
     setEditingProduct(prod);
-    
+
     let codeStr = prod.code || prod.productCode || '';
     if (!codeStr && prod.sizeProductCodes && Object.keys(prod.sizeProductCodes).length > 0) {
       codeStr = Object.entries(prod.sizeProductCodes).map(([k, v]) => `${k}:${v}`).join(', ');
     }
     setFormCode(codeStr || ('PRD-' + prod.id.slice(-5)));
-    
+
     setFormName(prod.name);
     setFormImage(prod.image);
     setFormCategory(prod.categoryId);
@@ -120,7 +144,7 @@ export default function ProductsPage() {
     setFormSpecification(prod.specification || '');
     setFormSizes(prod.sizes ? prod.sizes.join(', ') : '');
     setFormStatus(prod.status || 'Active');
-    
+
     let psStr = prod.packing || '';
     if (!psStr && prod.packSizes) {
       psStr = Object.entries(prod.packSizes).map(([k, v]) => `${k}:${v}`).join(', ');
@@ -128,7 +152,7 @@ export default function ProductsPage() {
       psStr = `All:${prod.packSize}`;
     }
     setFormPacking(psStr);
-    
+
     setIsModalOpen(true);
   };
 
@@ -195,7 +219,7 @@ export default function ProductsPage() {
 
     const previousProducts = [...products];
     const catName = categories.find(c => c.id === formCategory)?.name || 'General';
-    
+
     if (editingProduct) {
       setProducts(products.map(p => p.id === editingProduct.id ? { ...p, ...payload, categoryName: catName } : p));
     } else {
@@ -247,21 +271,12 @@ export default function ProductsPage() {
     e.dataTransfer.setData('text/plain', index);
     e.target.style.opacity = '0.5';
   };
-
-  const handleDragEnd = (e) => {
-    e.target.style.opacity = '1';
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-
+  const handleDragEnd = (e) => { e.target.style.opacity = '1'; };
+  const handleDragOver = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
   const handleDrop = (e, targetIndex) => {
     e.preventDefault();
     const sourceIndex = parseInt(e.dataTransfer.getData('text/plain'), 10);
     if (sourceIndex === targetIndex) return;
-
     const newCols = [...columns];
     const [draggedItem] = newCols.splice(sourceIndex, 1);
     newCols.splice(targetIndex, 0, draggedItem);
@@ -276,86 +291,78 @@ export default function ProductsPage() {
   const renderCell = (col, product) => {
     switch (col.id) {
       case 'code':
-        return (
-          <div style={{ fontFamily: 'monospace', fontWeight: '600', color: '#1677ff', fontSize: '13px' }}>
-            {product.code || product.productCode || `PRD-${(product.id || '').slice(-5)}`}
-          </div>
-        );
+        return <span className="code-link">{product.code || product.productCode || `PRD-${(product.id || '').slice(-5)}`}</span>;
       case 'productCode':
         if (product.sizeProductCodes && Object.keys(product.sizeProductCodes).length > 0) {
           return (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', fontFamily: 'monospace', fontSize: '12px' }}>
+            <div className="code-list">
               {Object.values(product.sizeProductCodes).map((code, idx) => (
-                <div key={idx} style={{ whiteSpace: 'nowrap', fontWeight: '600', color: '#1677ff' }}>
-                  {code}
-                </div>
+                <div key={idx} style={{ whiteSpace: 'nowrap' }}>{code}</div>
               ))}
             </div>
           );
         }
         return <span style={{ color: '#9ca3af' }}>-</span>;
       case 'name':
-        return <div style={{ fontWeight: '500', color: '#1f2937' }}>{product.name}</div>;
+        return <div className="name-cell">{product.name}</div>;
       case 'category':
         return (
-          <span className="badge badge-dispatched" style={{ backgroundColor: '#e6f4ff', color: '#1677ff', borderColor: '#91caff' }}>
-            {product.categoryName}
+          <span className="cat-badge">
+            <Icon name="box" size={26} />
+            <span>{product.categoryName}</span>
           </span>
         );
       case 'uom':
-        return <span style={{ fontWeight: '500', color: '#4b5563', fontSize: '13px' }}>{product.uom || 'Nos'}</span>;
+        return <span>{product.uom || 'Nos'}</span>;
       case 'sizes':
         return product.sizes && product.sizes.length > 0 ? (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
-            {product.sizes.map((s, idx) => (
-              <span key={idx} className="badge" style={{ background: '#f5f5f5', border: '1px solid #d9d9d9', color: '#595959' }}>{s}</span>
-            ))}
+          <div className="size-chips">
+            {product.sizes.map((s, idx) => <span key={idx} className="size-chip">{s}</span>)}
           </div>
         ) : <span style={{ color: '#9ca3af' }}>-</span>;
-      case 'packing':
+      case 'packing': {
         let packingStr = product.packing;
         if (!packingStr && product.packSizes) {
           packingStr = Object.entries(product.packSizes).map(([k, v]) => `${k}:${v}`).join(', ');
         } else if (!packingStr && product.packSize) {
           packingStr = `All:${product.packSize}`;
         }
-        return <span style={{ fontSize: '13px', color: '#4b5563' }}>{packingStr || '-'}</span>;
-      case 'status':
+        return <span style={{ fontSize: '0.88rem' }}>{packingStr || '-'}</span>;
+      }
+      case 'status': {
         const isActive = product.status !== 'Inactive';
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span className={`badge ${isActive ? 'badge-dispatched' : 'badge-cancelled'}`}>
-              {isActive ? 'Active' : 'Inactive'}
-            </span>
+          <div className="status-wrap">
+            <span className={`status-badge ${isActive ? 'active' : 'inactive'}`}>{isActive ? 'Active' : 'Inactive'}</span>
             <button
+              className={`switch${isActive ? ' on' : ''}`}
               onClick={() => handleToggleStatus(product)}
-              style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '2px', color: isActive ? '#52c41a' : '#ff4d4f' }}
               title={`Click to set ${isActive ? 'Inactive' : 'Active'}`}
-            >
-              {isActive ? <ToggleRight size={22} /> : <ToggleLeft size={22} />}
-            </button>
+              aria-label={`Set ${isActive ? 'Inactive' : 'Active'}`}
+            />
           </div>
         );
+      }
       case 'image':
         return (
-          <div style={{ width: '38px', height: '38px', borderRadius: '6px', background: '#f5f5f5', overflow: 'hidden' }}>
-            <img src={getImageUrl(product.image)} alt={product.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          <div className="thumb">
+            <img src={getImageUrl(product.image)} alt={product.name} />
           </div>
         );
       case 'description':
-        return <div style={{ fontSize: '13px', color: '#6b7280' }}>{product.description || '-'}</div>;
+        return <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>{product.description || '-'}</div>;
       case 'details':
-        return <div style={{ fontSize: '13px', color: '#6b7280' }}>{product.details || '-'}</div>;
+        return <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>{product.details || '-'}</div>;
       case 'specification':
-        return <div style={{ fontSize: '13px', color: '#6b7280' }}>{product.specification || '-'}</div>;
+        return <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>{product.specification || '-'}</div>;
       case 'actions':
         return (
-          <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
-            <button onClick={() => openEditModal(product)} style={{ background: 'none', border: 'none', color: '#1677ff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Edit size={14} /> Edit
+          <div className="row-actions">
+            <button className="btn btn-sm btn-soft-blue" onClick={() => openEditModal(product)}>
+              <Icon name="editing" size={18} /> Edit
             </button>
-            <button onClick={() => handleDelete(product.id)} style={{ background: 'none', border: 'none', color: '#ff4d4f', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <Trash2 size={14} /> Delete
+            <button className="btn btn-sm btn-soft-red" onClick={() => handleDelete(product.id)}>
+              <Icon name="bin" size={18} /> Delete
             </button>
           </div>
         );
@@ -365,187 +372,147 @@ export default function ProductsPage() {
   };
 
   const visibleCols = columns.filter(c => c.visible);
+  const pagedProducts = products.slice((page - 1) * pageSize, page * pageSize);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', backgroundColor: 'var(--bg-body)' }}>
-      <Sidebar />
-      <Navbar />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '24px' }}>
+    <AdminLayout
+      title="Products"
+      subtitle="Complete Product Master: Code, name, category, UOM, Sizes, Packing, and status (Active/Inactive)."
+      breadcrumb={['Products']}
+      aside={
+        <div className="count-chip">
+          <span className="chip-ic"><Icon name="box" size={26} color="#fff" /></span>
+          <div><strong>{loading ? '…' : products.length}</strong><span>Total Products</span></div>
+        </div>
+      }
+    >
+      <div className="ds-card">
+        {/* Action toolbar */}
+        <div className="toolbar">
+          <div className="toolbar-group">
+            <div className="search-field" style={{ width: '20.6rem' }}>
+              <Search size={20} strokeWidth={2.4} className="search-ic" />
+              <input
+                type="text"
+                placeholder="Search by Code, Name, Category..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && fetchProducts()}
+              />
+            </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <div>
-            <h1 style={{ fontSize: '20px', fontWeight: '600' }}>Products Collection ({products.length})</h1>
-            <p style={{ fontSize: '13px', color: '#6b7280', marginTop: '4px' }}>
-              Complete Product Master: Code, Name, Category, UOM, Sizes, Packing, and Status (Active/Inactive).
-            </p>
+            <select
+              className="field"
+              style={{ width: '14.8rem' }}
+              value={selectedCategory}
+              onChange={(e) => setSelectedCategory(e.target.value)}
+            >
+              <option value="">All Categories</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+
+            <button className="btn btn-outline" style={{ minWidth: '6.9rem' }} onClick={() => fetchProducts()}>
+              <Icon name="filter" size={20} /> Filter
+            </button>
+          </div>
+
+          <div className="toolbar-group">
+            <button className="btn btn-outline" onClick={() => setShowColConfig(!showColConfig)}>
+              <Icon name="setting" size={22} /> Configure Columns
+            </button>
+            <button className="btn btn-primary" onClick={openAddModal} style={{ minWidth: '10.8rem' }}>
+              <Icon name="plus" size={18} /> Add Product
+            </button>
+
+            {/* Column configurator popover */}
+            {showColConfig && (
+              <div className="popover" style={{ right: '12rem' }}>
+                <div className="popover-title">Configure Columns (drag to reorder)</div>
+                {columns.map((col, index) => (
+                  <div
+                    key={col.id}
+                    className="col-row"
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, index)}
+                  >
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <GripVertical size={14} color="#9ca3af" /> {COLUMN_LABELS[col.id] || col.label}
+                    </span>
+                    <button onClick={() => toggleColumn(col.id)} style={{ color: col.visible ? '#0d6efd' : '#9ca3af' }}>
+                      {col.visible ? <Eye size={16} /> : <EyeOff size={16} />}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="glass-card" style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-          
-          {/* Action Toolbar */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 24px', borderBottom: '1px solid var(--border-color)' }}>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <div style={{ position: 'relative', width: '280px' }}>
-                <Search size={16} color="#9ca3af" style={{ position: 'absolute', left: '12px', top: '10px' }} />
-                <input
-                  type="text"
-                  className="glass-input"
-                  style={{ paddingLeft: '36px', height: '36px' }}
-                  placeholder="Search by Code, Name, Category..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && fetchProducts()}
-                />
-              </div>
-
-              <select
-                className="glass-input"
-                style={{ width: '180px', height: '36px' }}
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-              >
-                <option value="">All Categories</option>
-                {categories.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
+        {/* Data table */}
+        <div className="table-wrap">
+          <table className="ds-table">
+            <thead>
+              <tr>
+                {visibleCols.map(col => (
+                  <th key={col.id} className={col.id === 'actions' ? 'center' : ''} style={{
+                    width: col.id === 'image' ? '7rem' : col.id === 'actions' ? '14rem' : undefined,
+                    minWidth: col.id === 'code' || col.id === 'productCode' ? '8.2rem' : col.id === 'status' ? '10.5rem' : undefined,
+                  }}>
+                    {COLUMN_LABELS[col.id] || col.label}
+                  </th>
                 ))}
-              </select>
-
-              <button className="btn-secondary" style={{ height: '36px', padding: '0 12px' }} onClick={fetchProducts}>
-                <Filter size={16} style={{ marginRight: '6px', display: 'inline' }} /> Filter
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', position: 'relative' }}>
-              <button 
-                className="btn-secondary" 
-                style={{ height: '36px', padding: '0 12px' }} 
-                onClick={() => setShowColConfig(!showColConfig)}
-              >
-                <Settings2 size={16} style={{ marginRight: '6px', display: 'inline' }} /> Configure Columns
-              </button>
-              
-              <button className="btn-primary" style={{ height: '36px' }} onClick={openAddModal}>
-                <Plus size={16} /> Add Product
-              </button>
-
-              {/* Column Configurator Popover */}
-              {showColConfig && (
-                <div style={{
-                  position: 'absolute',
-                  top: '44px',
-                  right: '100px',
-                  width: '300px',
-                  background: '#fff',
-                  border: '1px solid var(--border-color)',
-                  borderRadius: '6px',
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                  zIndex: 50,
-                  padding: '12px'
-                }}>
-                  <div style={{ fontSize: '13px', fontWeight: '600', marginBottom: '12px', color: '#1f2937' }}>
-                    Configure Columns (Drag to Reorder)
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    {columns.map((col, index) => (
-                      <div
-                        key={col.id}
-                        draggable
-                        onDragStart={(e) => handleDragStart(e, index)}
-                        onDragEnd={handleDragEnd}
-                        onDragOver={handleDragOver}
-                        onDrop={(e) => handleDrop(e, index)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '8px',
-                          background: '#fafafa',
-                          border: '1px solid #f0f0f0',
-                          borderRadius: '4px',
-                          cursor: 'grab'
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <GripVertical size={14} color="#9ca3af" />
-                          <span style={{ fontSize: '13px', color: '#4b5563' }}>{col.label}</span>
-                        </div>
-                        <button
-                          onClick={() => toggleColumn(col.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: col.visible ? '#1677ff' : '#9ca3af' }}
-                        >
-                          {col.visible ? <Eye size={16} /> : <EyeOff size={16} />}
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Dynamic Data Table */}
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan={visibleCols.length} className="empty-cell">Loading products...</td></tr>
+              ) : pagedProducts.map(product => (
+                <tr key={product.id}>
                   {visibleCols.map(col => (
-                    <th key={col.id} style={{ 
-                      padding: '12px 24px', 
-                      width: col.id === 'image' ? '70px' : col.id === 'actions' ? '140px' : 'auto',
-                      textAlign: col.id === 'actions' ? 'center' : 'left'
-                    }}>
-                      {col.label}
-                    </th>
+                    <td key={col.id} className={col.id === 'actions' ? 'center' : ''}>
+                      {renderCell(col, product)}
+                    </td>
                   ))}
                 </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={visibleCols.length} style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>Loading products...</td>
-                  </tr>
-                ) : products.length === 0 ? (
-                  <tr>
-                    <td colSpan={visibleCols.length} style={{ textAlign: 'center', padding: '40px', color: '#9ca3af' }}>No products found.</td>
-                  </tr>
-                ) : (
-                  products.map(product => (
-                    <tr key={product.id}>
-                      {visibleCols.map(col => (
-                        <td key={col.id} style={{ padding: '12px 24px', textAlign: col.id === 'actions' ? 'center' : 'left' }}>
-                          {renderCell(col, product)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          
-          <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', color: '#9ca3af', fontSize: '13px' }}>
-            Total {products.length} items
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
+
+        {!loading && products.length === 0 && (
+          <EmptyState
+            title="No products found"
+            text="Try a different search or category, or add a new product."
+            action={<button className="btn btn-primary" onClick={openAddModal}><Icon name="plus" size={20} /> Add Product</button>}
+          />
+        )}
+
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          total={products.length}
+          onPageChange={setPage}
+          onPageSizeChange={(n) => { setPageSize(n); setPage(1); }}
+          itemLabel="products"
+        />
       </div>
 
-      {/* Add / Edit Form Modal */}
+      {/* Add / Edit form modal */}
       {isModalOpen && (
         <div className="modal-overlay" onClick={() => setIsModalOpen(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '540px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '24px', color: '#1f2937' }}>
-              {editingProduct ? 'Edit Product' : 'Add New Product'}
-            </h3>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '38rem' }}>
+            <h3 className="modal-title">{editingProduct ? 'Edit Product' : 'Add New Product'}</h3>
 
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
+            <form onSubmit={handleSubmit} className="modal-form">
+              <div className="form-grid-1-2">
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Product Code *</label>
+                  <label className="form-label">Product Code *</label>
                   <input
                     type="text"
-                    className="glass-input"
+                    className="field"
                     placeholder="e.g. PRD-1001 or 300L:FG-400128, 500L:FG-400124"
                     value={formCode}
                     onChange={(e) => setFormCode(e.target.value)}
@@ -553,10 +520,10 @@ export default function ProductsPage() {
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Product Name *</label>
+                  <label className="form-label">Product Name *</label>
                   <input
                     type="text"
-                    className="glass-input"
+                    className="field"
                     placeholder="e.g. Heavy Duty CPVC Fitting"
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
@@ -565,29 +532,21 @@ export default function ProductsPage() {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+              <div className="form-grid-3">
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Category *</label>
-                  <select
-                    className="glass-input"
-                    value={formCategory}
-                    onChange={(e) => setFormCategory(e.target.value)}
-                    required
-                  >
+                  <label className="form-label">Category *</label>
+                  <select className="field" value={formCategory} onChange={(e) => setFormCategory(e.target.value)} required>
                     <option value="">Select Category</option>
-                    {categories.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
-
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>UOM (Unit)</label>
-                  <select
-                    className="glass-input"
-                    value={formUom}
-                    onChange={(e) => setFormUom(e.target.value)}
-                  >
+                  <label className="form-label">UOM (Unit)</label>
+                  <select className="field" value={formUom} onChange={(e) => setFormUom(e.target.value)}>
+                    {/* keep the product's own UOM (e.g. "LTR") selectable even if it is not in the standard list */}
+                    {formUom && !['Nos', 'Pcs', 'Box', 'Set', 'Mtr', 'Bundle', 'Kg', 'Pkt', 'Ltr'].includes(formUom) && (
+                      <option value={formUom}>{formUom}</option>
+                    )}
                     <option value="Nos">Nos</option>
                     <option value="Pcs">Pcs</option>
                     <option value="Box">Box</option>
@@ -599,99 +558,60 @@ export default function ProductsPage() {
                     <option value="Ltr">Ltr</option>
                   </select>
                 </div>
-
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Status</label>
-                  <select
-                    className="glass-input"
-                    value={formStatus}
-                    onChange={(e) => setFormStatus(e.target.value)}
-                  >
+                  <label className="form-label">Status</label>
+                  <select className="field" value={formStatus} onChange={(e) => setFormStatus(e.target.value)}>
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
                   </select>
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-grid-2">
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Sizes (Comma-separated)</label>
-                  <input
-                    type="text"
-                    className="glass-input"
-                    placeholder="e.g. 1/2 inch, 3/4 inch, 1 inch"
-                    value={formSizes}
-                    onChange={(e) => setFormSizes(e.target.value)}
-                  />
+                  <label className="form-label">Sizes (comma-separated)</label>
+                  <input type="text" className="field" placeholder="e.g. 1/2 inch, 3/4 inch, 1 inch" value={formSizes} onChange={(e) => setFormSizes(e.target.value)} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Packing</label>
-                  <input
-                    type="text"
-                    className="glass-input"
-                    placeholder="e.g. 1/2:24, 3/4:24 or 24 Pcs/Box"
-                    value={formPacking}
-                    onChange={(e) => setFormPacking(e.target.value)}
-                  />
+                  <label className="form-label">Packing</label>
+                  <input type="text" className="field" placeholder="e.g. 1/2:24, 3/4:24 or 24 Pcs/Box" value={formPacking} onChange={(e) => setFormPacking(e.target.value)} />
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Product Image</label>
+                <label className="form-label">Product Image</label>
                 {formImage ? (
-                  <div style={{ position: 'relative', width: '100%', height: '120px', borderRadius: '6px', overflow: 'hidden', marginBottom: '10px', border: '1px solid #d9d9d9' }}>
-                    <img src={getImageUrl(formImage)} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#fafafa' }} />
-                    <button
-                      type="button"
-                      onClick={() => setFormImage('')}
-                      style={{ position: 'absolute', top: '8px', right: '8px', background: '#ff4d4f', color: '#fff', border: 'none', borderRadius: '4px', padding: '4px 8px', cursor: 'pointer', fontSize: '12px' }}
-                    >
+                  <div className="img-preview">
+                    <img src={getImageUrl(formImage)} alt="Preview" />
+                    <button type="button" className="btn btn-sm btn-soft-red" onClick={() => setFormImage('')} style={{ position: 'absolute', top: 8, right: 8 }}>
                       Clear
                     </button>
                   </div>
                 ) : null}
-                <input
-                  type="url"
-                  className="glass-input"
-                  placeholder="Image URL (e.g., https://images.unsplash.com/...)"
-                  value={formImage}
-                  onChange={(e) => setFormImage(e.target.value)}
-                />
+                <input type="url" className="field" placeholder="Image URL (e.g., https://images.unsplash.com/...)" value={formImage} onChange={(e) => setFormImage(e.target.value)} />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+              <div className="form-grid-2">
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Description</label>
-                  <textarea
-                    className="glass-input"
-                    rows={2}
-                    placeholder="Short description..."
-                    value={formDesc}
-                    onChange={(e) => setFormDesc(e.target.value)}
-                  />
+                  <label className="form-label">Description</label>
+                  <textarea className="field" rows={2} placeholder="Short description..." value={formDesc} onChange={(e) => setFormDesc(e.target.value)} />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#4b5563', marginBottom: '6px' }}>Details</label>
-                  <textarea
-                    className="glass-input"
-                    rows={2}
-                    placeholder="Extended details..."
-                    value={formDetails}
-                    onChange={(e) => setFormDetails(e.target.value)}
-                  />
+                  <label className="form-label">Details</label>
+                  <textarea className="field" rows={2} placeholder="Extended details..." value={formDetails} onChange={(e) => setFormDetails(e.target.value)} />
                 </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '20px' }}>
-                <button type="button" className="btn-secondary" onClick={() => setIsModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn-primary" disabled={submitting}>
-                  {submitting ? 'Saving...' : 'Save & Sync Couchbase'}
+              <div className="modal-actions">
+                <button type="button" className="btn btn-outline" onClick={() => setIsModalOpen(false)}>Cancel</button>
+                <button type="submit" className="btn btn-primary" disabled={submitting}>
+                  {submitting ? 'Saving...' : 'Save & Sync MongoDB'}
                 </button>
               </div>
             </form>
           </div>
         </div>
       )}
-    </div>
+    </AdminLayout>
   );
 }
