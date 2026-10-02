@@ -101,7 +101,11 @@ a { color: inherit; }
   position: fixed;
   inset: 0 auto 0 0;
   width: var(--sidebar-w);
-  background: var(--sidebar);
+  background-color: var(--sidebar);
+  background-image: url('/design/sidebar-bg.png');
+  background-repeat: no-repeat;
+  background-position: bottom center;
+  background-size: cover;
   display: flex;
   flex-direction: column;
   z-index: 60;

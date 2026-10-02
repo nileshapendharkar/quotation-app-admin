@@ -40,8 +40,6 @@ export default function Sidebar({ onNavigate }) {
           );
         })}
       </nav>
-
-      <img className="sidebar-art" src="/design/sidebar-art.png" alt="" aria-hidden="true" />
     </aside>
   );
 }
