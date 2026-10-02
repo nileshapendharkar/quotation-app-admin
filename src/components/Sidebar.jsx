@@ -4,11 +4,11 @@ import { usePathname } from 'next/navigation';
 import Icon, { CalendarCheckIcon } from './Icon';
 
 const NAV_ITEMS = [
-  { name: 'Dashboard', href: '/', icon: <Icon name="home" size={32} color="#fff" /> },
-  { name: 'Products', href: '/products', icon: <CalendarCheckIcon size={30} color="#fff" /> },
-  { name: 'Categories', href: '/categories', icon: <Icon name="product" size={32} color="#fff" /> },
-  { name: 'Orders', href: '/orders', icon: <Icon name="order" size={30} color="#fff" /> },
-  { name: 'Users', href: '/users', icon: <Icon name="user" size={30} color="#fff" /> },
+  { name: 'Dashboard', href: '/', icon: <Icon name="home" size={20} color="#fff" /> },
+  { name: 'Products', href: '/products', icon: <CalendarCheckIcon size={20} color="#fff" /> },
+  { name: 'Categories', href: '/categories', icon: <Icon name="product" size={20} color="#fff" /> },
+  { name: 'Orders', href: '/orders', icon: <Icon name="order" size={20} color="#fff" /> },
+  { name: 'Users', href: '/users', icon: <Icon name="user" size={20} color="#fff" /> },
 ];
 
 export default function Sidebar({ onNavigate }) {
@@ -34,7 +34,7 @@ export default function Sidebar({ onNavigate }) {
               className={`sidebar-link${isActive ? ' active' : ''}`}
               onClick={onNavigate}
             >
-              <span style={{ width: '2rem', display: 'inline-flex', justifyContent: 'center' }}>{item.icon}</span>
+              <span style={{ width: '1.5rem', display: 'inline-flex', justifyContent: 'center', alignItems: 'center' }}>{item.icon}</span>
               {item.name}
             </Link>
           );
