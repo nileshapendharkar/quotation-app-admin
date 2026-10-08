@@ -1,6 +1,6 @@
 import { apiCircuitBreaker } from './CircuitBreaker';
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://quotation-app-backend.onrender.com/api';
+export const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://quotation-app-backend-master.vercel.app/api';
 
 export const getImageUrl = (path) => {
   if (!path) return 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=500&q=80';

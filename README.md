@@ -6,9 +6,9 @@ Admin Web Dashboard for the Product Quotation platform for **Ganesh Gouri Indust
 
 ## 🌐 Live Admin Panel
 
-🔗 **Live URL:** [https://quotation-app-admin.onrender.com](https://quotation-app-admin.onrender.com)
+🔗 **Live URL:** [https://quotation-app-admin-master.vercel.app](https://quotation-app-admin-master.vercel.app)
 
-Hosted on [Render](https://render.com).
+Hosted on [Vercel](https://vercel.com).
 
 ---
 
