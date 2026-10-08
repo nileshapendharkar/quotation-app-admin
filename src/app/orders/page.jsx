@@ -231,7 +231,7 @@ export default function OrdersPage() {
   return (
     <AdminLayout
       title="Quotation Requests"
-      subtitle="Manage and track all quotation requests from your customers."
+      subtitle="Manage and track all quotation requests"
     >
       <div className="stat-grid" style={{ marginTop: '-0.6rem' }}>
         <StatCard compact tone="indigo" icon={<Icon name="document" size={30} />} value={count(orders)} label="Total Requests" sub="All quotation requests" spark={dailySeries(orders)} />

@@ -60,6 +60,8 @@ export default function Navbar({ title, eyebrow, subtitle, onMenuClick }) {
         {subtitle && <p className="page-subtitle">{subtitle}</p>}
       </div>
 
+      <div className="topbar-spacer" />
+
       <div className="topbar-search" ref={searchRef}>
         <Search size={22} strokeWidth={2.4} className="search-ic" />
         <input

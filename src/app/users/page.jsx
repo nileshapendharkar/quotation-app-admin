@@ -410,9 +410,8 @@ export default function UsersPage() {
 
   return (
     <AdminLayout
-      title="Authorized App Users"
-      subtitle="Manage access credentials (User ID, Password, Account Name, Physical Address, State, Status.)"
-      breadcrumb={['Users', 'Authorized App Users']}
+      title="Users"
+      subtitle="Manage access credentials"
     >
       <div className="stat-grid" style={{ marginTop: '-0.6rem' }}>
         <StatCard compact tone="indigo" icon={<Icon name="group" size={36} />} value={show(users.length)} label="Total App Users" sub="Authorized users in system" spark={dailySeries(users)} />

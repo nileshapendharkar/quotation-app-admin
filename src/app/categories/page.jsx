@@ -125,9 +125,8 @@ export default function CategoriesPage() {
 
   return (
     <AdminLayout
-      title="Categories Management"
-      subtitle="Organize and manage product categories for your business."
-      breadcrumb={['Categories']}
+      title="Categories"
+      subtitle="Organize and manage product categories"
       aside={
         <div className="count-chip">
           <span className="chip-ic"><Icon name="box" size={26} color="#fff" /></span>

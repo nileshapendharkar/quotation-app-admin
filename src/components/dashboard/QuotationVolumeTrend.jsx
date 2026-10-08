@@ -147,37 +147,6 @@ export default function QuotationVolumeTrend({ monthlyTrend = [], mounted }) {
 
       {/* Chart Area */}
       <div style={{ width: '100%', height: '260px', marginTop: 'auto', position: 'relative' }}>
-        {/* Persistent Apr 22 Quotations Tooltip as shown in reference design */}
-        <div style={{
-          position: 'absolute',
-          top: '41%',
-          left: '59%',
-          transform: 'translate(-50%, -100%)',
-          backgroundColor: '#072052',
-          color: '#ffffff',
-          padding: '6px 12px',
-          borderRadius: '8px',
-          boxShadow: '0 6px 16px rgba(7, 32, 82, 0.35)',
-          fontSize: '12px',
-          textAlign: 'center',
-          zIndex: 10,
-          pointerEvents: 'none',
-        }}>
-          <div style={{ fontWeight: '700', fontSize: '11px', lineHeight: '1.2' }}>Apr</div>
-          <div style={{ fontSize: '11px', color: '#93c5fd', whiteSpace: 'nowrap' }}>22 Quotations</div>
-          <div style={{
-            position: 'absolute',
-            bottom: '-5px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 0,
-            height: 0,
-            borderLeft: '5px solid transparent',
-            borderRight: '5px solid transparent',
-            borderTop: '5px solid #072052',
-          }} />
-        </div>
-
         {mounted ? (
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart 

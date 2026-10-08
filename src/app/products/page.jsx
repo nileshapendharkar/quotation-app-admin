@@ -377,8 +377,7 @@ export default function ProductsPage() {
   return (
     <AdminLayout
       title="Products"
-      subtitle="Complete Product Master: Code, name, category, UOM, Sizes, Packing, and status (Active/Inactive)."
-      breadcrumb={['Products']}
+      subtitle="Complete Product Master"
       aside={
         <div className="count-chip">
           <span className="chip-ic"><Icon name="box" size={26} color="#fff" /></span>

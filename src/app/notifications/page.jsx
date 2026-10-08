@@ -46,7 +46,6 @@ export default function NotificationsPage() {
     <AdminLayout
       title="Notifications"
       subtitle="Send updates to every registered customer of the mobile app."
-      breadcrumb={['Notifications']}
     >
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(22rem, 1fr))', gap: '1.25rem' }}>
         {/* Send broadcast */}

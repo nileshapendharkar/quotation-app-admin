@@ -257,27 +257,9 @@ export default function DashboardPage() {
               <YAxis allowDecimals={false} {...axisProps} domain={[0, 40]} ticks={[0, 10, 20, 30, 40]} />
               <Tooltip content={<TrendTooltip />} cursor={{ stroke: '#9fb0e6', strokeDasharray: '4 4' }} />
               <Area type="monotone" dataKey="count" stroke="#2f4392" strokeWidth={2.5} fill="url(#gradientTrend)"
-                dot={(props) => {
-                  const isApr = props.payload.month === 'Apr';
-                  return (
-                    <circle
-                      key={props.index}
-                      cx={props.cx}
-                      cy={props.cy}
-                      r={isApr ? 5 : 3}
-                      fill="#2f4392"
-                      stroke="#fff"
-                      strokeWidth={isApr ? 2 : 1.5}
-                    />
-                  );
-                }}
+                dot={{ r: 3, fill: '#2f4392', stroke: '#fff', strokeWidth: 1.5 }}
                 activeDot={{ r: 6, fill: '#2f4392', stroke: '#fff', strokeWidth: 2 }} />
             </AreaChart>
-            {/* Design reference static callout badge for Apr */}
-            <div className="apr-callout-badge" aria-hidden="true">
-              <span className="apr-month">Apr</span>
-              <span className="apr-val">22 Quotations</span>
-            </div>
           </div>
         );
     }
