@@ -75,6 +75,9 @@ export default function ProductsPage() {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
 
+  // Product Selection for Export
+  const [selectedProductIds, setSelectedProductIds] = useState(new Set());
+
   useEffect(() => {
     fetchCategories();
     // ?q= comes from the global header search
@@ -380,17 +383,52 @@ export default function ProductsPage() {
   };
 
   // ==========================================
-  // Excel Export Feature
+  // Product Selection Helpers
   // ==========================================
-  const handleExportExcel = () => {
-    if (!products || products.length === 0) {
+  const isAllSelected = products.length > 0 && selectedProductIds.size === products.length;
+  const isIndeterminate = selectedProductIds.size > 0 && selectedProductIds.size < products.length;
+
+  const handleToggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedProductIds(new Set());
+    } else {
+      setSelectedProductIds(new Set(products.map(p => p.id)));
+    }
+  };
+
+  const handleToggleRow = (id) => {
+    const next = new Set(selectedProductIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedProductIds(next);
+  };
+
+  const handleClearSelection = () => {
+    setSelectedProductIds(new Set());
+  };
+
+  // ==========================================
+  // Excel Export Feature (Multiple / Selected / All)
+  // ==========================================
+  const handleExportExcel = (onlySelected = false) => {
+    let targetProducts = products;
+    if (onlySelected || (selectedProductIds.size > 0 && onlySelected !== false)) {
+      if (selectedProductIds.size > 0) {
+        targetProducts = products.filter(p => selectedProductIds.has(p.id));
+      }
+    }
+
+    if (!targetProducts || targetProducts.length === 0) {
       alert('No products available to export.');
       return;
     }
 
     try {
       const rows = [];
-      products.forEach((p) => {
+      targetProducts.forEach((p) => {
         if (p.sizes && p.sizes.length > 0) {
           p.sizes.forEach((s) => {
             rows.push({
@@ -431,7 +469,12 @@ export default function ProductsPage() {
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Products');
 
       const dateStr = new Date().toISOString().split('T')[0];
-      XLSX.writeFile(workbook, `Products_Master_${dateStr}.xlsx`);
+      const isPartial = targetProducts.length < products.length;
+      const fileName = isPartial 
+        ? `Products_Selected_${targetProducts.length}_${dateStr}.xlsx` 
+        : `Products_Master_${dateStr}.xlsx`;
+
+      XLSX.writeFile(workbook, fileName);
     } catch (err) {
       console.error('Export error:', err);
       alert('Failed to export Excel: ' + err.message);
@@ -719,20 +762,77 @@ export default function ProductsPage() {
               <span>Import From Excel</span>
             </button>
 
-            <button
-              type="button"
-              className="excel-btn excel-btn-export"
-              onClick={handleExportExcel}
-              title="Export all Products to Excel"
-            >
-              <Download size={17} strokeWidth={2.4} />
-              <span>Export Excel</span>
-            </button>
+            {selectedProductIds.size > 0 ? (
+              <>
+                <button
+                  type="button"
+                  className="excel-btn excel-btn-import"
+                  onClick={() => handleExportExcel(true)}
+                  title={`Export ${selectedProductIds.size} selected products to Excel`}
+                >
+                  <Download size={17} strokeWidth={2.4} />
+                  <span>Export Selected ({selectedProductIds.size})</span>
+                </button>
+                <button
+                  type="button"
+                  className="excel-btn excel-btn-export"
+                  onClick={() => handleExportExcel(false)}
+                  title={`Export all ${products.length} products to Excel`}
+                >
+                  <Download size={17} strokeWidth={2.4} />
+                  <span>Export All</span>
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="excel-btn excel-btn-export"
+                onClick={() => handleExportExcel(false)}
+                title="Export all Products to Excel"
+              >
+                <Download size={17} strokeWidth={2.4} />
+                <span>Export Excel</span>
+              </button>
+            )}
           </div>
         </div>
       }
     >
       <div className="ds-card">
+        {/* Selection notification bar */}
+        {selectedProductIds.size > 0 && (
+          <div className="selection-bar">
+            <div className="selection-bar-left">
+              <span>✓ <strong>{selectedProductIds.size}</strong> of {products.length} products selected</span>
+            </div>
+            <div className="selection-bar-actions">
+              {!isAllSelected && (
+                <button
+                  type="button"
+                  className="btn-selection-action"
+                  onClick={handleToggleSelectAll}
+                >
+                  Select All ({products.length})
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn-selection-action"
+                onClick={handleClearSelection}
+              >
+                Clear Selection
+              </button>
+              <button
+                type="button"
+                className="btn-selection-action primary"
+                onClick={() => handleExportExcel(true)}
+              >
+                <Download size={14} /> Export Selected ({selectedProductIds.size})
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Action toolbar */}
         <div className="toolbar">
           <div className="toolbar-group">
@@ -802,6 +902,17 @@ export default function ProductsPage() {
           <table className="ds-table">
             <thead>
               <tr>
+                <th className="select-col" style={{ width: '3.2rem', textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    className="row-checkbox"
+                    checked={isAllSelected}
+                    ref={el => { if (el) el.indeterminate = isIndeterminate; }}
+                    onChange={handleToggleSelectAll}
+                    title={isAllSelected ? "Deselect All Products" : "Select All Products"}
+                    aria-label="Select all products"
+                  />
+                </th>
                 {visibleCols.map(col => (
                   <th key={col.id} className={col.id === 'actions' ? 'center' : ''} style={{
                     width: col.id === 'image' ? '7rem' : col.id === 'actions' ? '14rem' : undefined,
@@ -814,16 +925,28 @@ export default function ProductsPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={visibleCols.length} className="empty-cell">Loading products...</td></tr>
-              ) : pagedProducts.map(product => (
-                <tr key={product.id}>
-                  {visibleCols.map(col => (
-                    <td key={col.id} className={col.id === 'actions' ? 'center' : ''}>
-                      {renderCell(col, product)}
+                <tr><td colSpan={visibleCols.length + 1} className="empty-cell">Loading products...</td></tr>
+              ) : pagedProducts.map(product => {
+                const isSelected = selectedProductIds.has(product.id);
+                return (
+                  <tr key={product.id} className={isSelected ? 'selected-row' : ''}>
+                    <td className="select-col" style={{ textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        className="row-checkbox"
+                        checked={isSelected}
+                        onChange={() => handleToggleRow(product.id)}
+                        aria-label={`Select product ${product.name}`}
+                      />
                     </td>
-                  ))}
-                </tr>
-              ))}
+                    {visibleCols.map(col => (
+                      <td key={col.id} className={col.id === 'actions' ? 'center' : ''}>
+                        {renderCell(col, product)}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
