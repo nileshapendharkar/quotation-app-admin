@@ -131,7 +131,18 @@ export default function ProductsPage() {
 
     let codeStr = prod.code || prod.productCode || '';
     if (!codeStr && prod.sizeProductCodes && Object.keys(prod.sizeProductCodes).length > 0) {
-      codeStr = Object.entries(prod.sizeProductCodes).map(([k, v]) => `${k}:${v}`).join(', ');
+      if (prod.sizes && prod.sizes.length > 0) {
+        codeStr = prod.sizes
+          .map(s => {
+            const c = prod.sizeProductCodes[s];
+            return c ? `${s}:${c}` : null;
+          })
+          .filter(Boolean)
+          .join(', ');
+      }
+      if (!codeStr) {
+        codeStr = Object.entries(prod.sizeProductCodes).map(([k, v]) => `${k}:${v}`).join(', ');
+      }
     }
     setFormCode(codeStr || ('PRD-' + prod.id.slice(-5)));
 
@@ -147,7 +158,22 @@ export default function ProductsPage() {
 
     let psStr = prod.packing || '';
     if (!psStr && prod.packSizes) {
-      psStr = Object.entries(prod.packSizes).map(([k, v]) => `${k}:${v}`).join(', ');
+      if (prod.sizes && prod.sizes.length > 0) {
+        psStr = prod.sizes
+          .map(s => {
+            const v = (prod.packings && prod.packings[s] !== undefined)
+              ? prod.packings[s]
+              : (prod.packSizes && prod.packSizes[s] !== undefined)
+              ? prod.packSizes[s]
+              : '';
+            return v !== '' ? `${s}:${v}` : null;
+          })
+          .filter(Boolean)
+          .join(', ');
+      }
+      if (!psStr) {
+        psStr = Object.entries(prod.packSizes).map(([k, v]) => `${k}:${v}`).join(', ');
+      }
     } else if (!psStr && prod.packSize) {
       psStr = `All:${prod.packSize}`;
     }
@@ -288,21 +314,89 @@ export default function ProductsPage() {
     saveColumns(newCols);
   };
 
+  // Helper to find key in map matching size regardless of formatting
+  const findSizeKey = (sizeMap, querySize) => {
+    if (!sizeMap || !querySize) return null;
+    const queryStr = String(querySize).trim().toLowerCase();
+    const normalizedQuery = queryStr.replace(/[^a-z0-9]/g, '');
+
+    for (const key of Object.keys(sizeMap)) {
+      if (key.toLowerCase() === queryStr) return key;
+    }
+    for (const key of Object.keys(sizeMap)) {
+      if (key.toLowerCase().replace(/[^a-z0-9]/g, '') === normalizedQuery) return key;
+    }
+    return null;
+  };
+
+  const getProductPackingForSize = (product, size) => {
+    if (!product) return '-';
+    if (product.packings && typeof product.packings === 'object') {
+      if (product.packings[size] !== undefined) return product.packings[size];
+      const matched = findSizeKey(product.packings, size);
+      if (matched && product.packings[matched] !== undefined) return product.packings[matched];
+    }
+    if (product.packSizes && typeof product.packSizes === 'object') {
+      if (product.packSizes[size] !== undefined) return product.packSizes[size];
+      const matched = findSizeKey(product.packSizes, size);
+      if (matched && product.packSizes[matched] !== undefined) return product.packSizes[matched];
+    }
+    if (typeof product.packing === 'string' && product.packing.includes(':')) {
+      const pairs = product.packing.split(',').map(p => p.trim());
+      for (const pair of pairs) {
+        const [k, v] = pair.split(':').map(s => s.trim());
+        if (k && v) {
+          const normK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const normS = String(size).toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (normK === normS || normS.includes(normK) || normK.includes(normS)) return v;
+        }
+      }
+    }
+    if (product.packing !== undefined && product.packing !== null && typeof product.packing !== 'object' && !String(product.packing).includes(':')) {
+      return product.packing;
+    }
+    if (product.packSize !== undefined && product.packSize !== null && typeof product.packSize !== 'object' && !String(product.packSize).includes(':')) {
+      return product.packSize;
+    }
+    return '-';
+  };
+
+  const getProductCodeForSize = (product, size) => {
+    if (!product) return '-';
+    if (product.sizeProductCodes && typeof product.sizeProductCodes === 'object') {
+      if (product.sizeProductCodes[size]) return product.sizeProductCodes[size];
+      const matched = findSizeKey(product.sizeProductCodes, size);
+      if (matched && product.sizeProductCodes[matched]) return product.sizeProductCodes[matched];
+    }
+    return product.code || product.productCode || '-';
+  };
+
   const renderCell = (col, product) => {
     switch (col.id) {
       case 'code':
         return <span className="code-link">{product.code || product.productCode || `PRD-${(product.id || '').slice(-5)}`}</span>;
       case 'productCode':
-        if (product.sizeProductCodes && Object.keys(product.sizeProductCodes).length > 0) {
+        if (product.sizes && product.sizes.length > 0) {
           return (
-            <div className="code-list">
-              {Object.values(product.sizeProductCodes).map((code, idx) => (
-                <div key={idx} style={{ whiteSpace: 'nowrap' }}>{code}</div>
+            <div className="variant-list code-list">
+              {product.sizes.map((s, idx) => (
+                <div key={idx} className="variant-row code-text">
+                  {getProductCodeForSize(product, s)}
+                </div>
               ))}
             </div>
           );
         }
-        return <span style={{ color: '#9ca3af' }}>-</span>;
+        if (product.sizeProductCodes && Object.keys(product.sizeProductCodes).length > 0) {
+          return (
+            <div className="variant-list code-list">
+              {Object.values(product.sizeProductCodes).map((code, idx) => (
+                <div key={idx} className="variant-row code-text">{code}</div>
+              ))}
+            </div>
+          );
+        }
+        return <span style={{ color: '#9ca3af' }}>{product.code || product.productCode || '-'}</span>;
       case 'name':
         return <div className="name-cell">{product.name}</div>;
       case 'category':
@@ -316,18 +410,33 @@ export default function ProductsPage() {
         return <span>{product.uom || 'Nos'}</span>;
       case 'sizes':
         return product.sizes && product.sizes.length > 0 ? (
-          <div className="size-chips">
-            {product.sizes.map((s, idx) => <span key={idx} className="size-chip">{s}</span>)}
+          <div className="variant-list size-list">
+            {product.sizes.map((s, idx) => (
+              <div key={idx} className="variant-row">
+                <span className="size-chip">{s}</span>
+              </div>
+            ))}
           </div>
         ) : <span style={{ color: '#9ca3af' }}>-</span>;
       case 'packing': {
-        let packingStr = product.packing;
-        if (!packingStr && product.packSizes) {
-          packingStr = Object.entries(product.packSizes).map(([k, v]) => `${k}:${v}`).join(', ');
-        } else if (!packingStr && product.packSize) {
-          packingStr = `All:${product.packSize}`;
+        if (product.sizes && product.sizes.length > 0) {
+          return (
+            <div className="variant-list packing-list">
+              {product.sizes.map((s, idx) => (
+                <div key={idx} className="variant-row">
+                  <span className="packing-chip">{getProductPackingForSize(product, s)}</span>
+                </div>
+              ))}
+            </div>
+          );
         }
-        return <span style={{ fontSize: '0.88rem' }}>{packingStr || '-'}</span>;
+        let singlePack = product.packing;
+        if (!singlePack && product.packSize) singlePack = product.packSize;
+        if (!singlePack && product.packSizes && typeof product.packSizes === 'object') {
+          const vals = Object.values(product.packSizes);
+          singlePack = vals.length === 1 ? vals[0] : (vals.length > 0 ? vals.join(', ') : '-');
+        }
+        return <span className="packing-chip">{singlePack || '-'}</span>;
       }
       case 'status': {
         const isActive = product.status !== 'Inactive';

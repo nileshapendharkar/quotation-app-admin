@@ -544,7 +544,10 @@ table { width: 100%; border-collapse: collapse; }
 th { text-align: left; }
 
 .code-link { color: #1060ff; font-size: 1rem; white-space: nowrap; }
-.code-list { display: flex; flex-direction: column; gap: 0; font-size: 0.78rem; line-height: 1.32; color: #1060ff; }
+.code-list { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.8rem; color: #1060ff; }
+.variant-list { display: flex; flex-direction: column; gap: 0.3rem; }
+.variant-row { display: flex; align-items: center; height: 1.65rem; white-space: nowrap; }
+.variant-row.code-text { color: #1060ff; font-size: 0.82rem; font-weight: 500; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 .name-cell { text-transform: uppercase; font-size: 1rem; line-height: 1.05; }
 .cat-badge {
   display: inline-flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0.7rem; border-radius: 0.4rem;
@@ -552,7 +555,9 @@ th { text-align: left; }
 }
 .cat-badge .ds-icon { background-color: #29b6f6; }
 .size-chips { display: flex; flex-wrap: wrap; gap: 0.3rem; max-width: 17rem; }
-.size-chip { padding: 0.15rem 0.6rem; border-radius: 0.3rem; background: #f3f5f7; border: 1px solid #d0d4da; font-size: 0.8rem; color: var(--text); }
+.size-list, .packing-list { display: flex; flex-direction: column; gap: 0.3rem; }
+.size-chip { padding: 0.15rem 0.6rem; border-radius: 0.3rem; background: #f3f5f7; border: 1px solid #d0d4da; font-size: 0.8rem; color: var(--text); display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; box-sizing: border-box; }
+.packing-chip { padding: 0.15rem 0.6rem; border-radius: 0.3rem; background: #ecfdf5; border: 1px solid #a7f3d0; font-size: 0.82rem; font-weight: 600; color: #047857; display: inline-flex; align-items: center; justify-content: center; min-width: 2.2rem; white-space: nowrap; box-sizing: border-box; }
 .thumb { width: 4.4rem; height: 4.6rem; border-radius: 0.4rem; background: #f3f5f7; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .thumb img { width: 100%; height: 100%; object-fit: contain; }
 .thumb.sm { width: 4rem; height: 3.1rem; }
