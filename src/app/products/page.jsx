@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 import AdminLayout from '@/components/AdminLayout';
 import Icon from '@/components/Icon';
 import { Pagination, EmptyState, getUrlQuery } from '@/components/ui';
-import { Search, GripVertical, Eye, EyeOff } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { Search, GripVertical, Eye, EyeOff, Upload, Download, FileSpreadsheet, X, AlertCircle } from 'lucide-react';
 import { apiFetch, getImageUrl } from '@/lib/api';
 
 // Header labels as shown in the design (saved column settings keep their order/visibility,
@@ -66,6 +67,13 @@ export default function ProductsPage() {
   const [formPacking, setFormPacking] = useState('');
   const [formStatus, setFormStatus] = useState('Active');
   const [submitting, setSubmitting] = useState(false);
+
+  // Excel Import / Export State
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [importFileName, setImportFileName] = useState('');
+  const [importRows, setImportRows] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
 
   useEffect(() => {
     fetchCategories();
@@ -371,6 +379,209 @@ export default function ProductsPage() {
     return product.code || product.productCode || '-';
   };
 
+  // ==========================================
+  // Excel Export Feature
+  // ==========================================
+  const handleExportExcel = () => {
+    if (!products || products.length === 0) {
+      alert('No products available to export.');
+      return;
+    }
+
+    try {
+      const rows = [];
+      products.forEach((p) => {
+        if (p.sizes && p.sizes.length > 0) {
+          p.sizes.forEach((s) => {
+            rows.push({
+              'Product Code': getProductCodeForSize(p, s),
+              'Product Name': p.name || '',
+              'UOM': p.uom || 'Nos',
+              'Sizes': s,
+              'Packing': getProductPackingForSize(p, s)
+            });
+          });
+        } else {
+          let singlePack = p.packing;
+          if (!singlePack && p.packSize) singlePack = p.packSize;
+          if (!singlePack && p.packSizes && typeof p.packSizes === 'object') {
+            const vals = Object.values(p.packSizes);
+            singlePack = vals.length > 0 ? vals[0] : '-';
+          }
+          rows.push({
+            'Product Code': p.code || p.productCode || (p.id ? 'PRD-' + p.id.replace(/^prod_/, '') : '-'),
+            'Product Name': p.name || '',
+            'UOM': p.uom || 'Nos',
+            'Sizes': '-',
+            'Packing': singlePack || '-'
+          });
+        }
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      worksheet['!cols'] = [
+        { wch: 18 }, // Product Code
+        { wch: 40 }, // Product Name
+        { wch: 10 }, // UOM
+        { wch: 16 }, // Sizes
+        { wch: 14 }  // Packing
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Products');
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(workbook, `Products_Master_${dateStr}.xlsx`);
+    } catch (err) {
+      console.error('Export error:', err);
+      alert('Failed to export Excel: ' + err.message);
+    }
+  };
+
+  // ==========================================
+  // Download Sample Template
+  // ==========================================
+  const handleDownloadSample = () => {
+    const sampleRows = [
+      {
+        'Product Code': 'FG-400921',
+        'Product Name': 'CPVC PIPES (SDR 13.5)',
+        'UOM': 'BDL',
+        'Sizes': '1/2" - 3MTR',
+        'Packing': 50
+      },
+      {
+        'Product Code': 'FG-400927',
+        'Product Name': 'CPVC PIPES (SDR 13.5)',
+        'UOM': 'BDL',
+        'Sizes': '1/2" - 5MTR',
+        'Packing': 50
+      },
+      {
+        'Product Code': 'FG-400922',
+        'Product Name': 'CPVC PIPES (SDR 13.5)',
+        'UOM': 'BDL',
+        'Sizes': '3/4" - 3MTR',
+        'Packing': 50
+      },
+      {
+        'Product Code': 'FG-401569',
+        'Product Name': 'CONSTRUCTION GHAMELA SHIVA',
+        'UOM': 'BAGS',
+        'Sizes': '-',
+        'Packing': 75
+      }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(sampleRows);
+    ws['!cols'] = [{ wch: 18 }, { wch: 35 }, { wch: 10 }, { wch: 16 }, { wch: 12 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Products_Template');
+    XLSX.writeFile(wb, 'Products_Import_Template.xlsx');
+  };
+
+  // ==========================================
+  // Excel File Upload & Parse
+  // ==========================================
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportFileName(file.name);
+    setImportError('');
+    const reader = new FileReader();
+
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        const rawJson = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+        if (!rawJson || rawJson.length === 0) {
+          setImportError('The selected Excel file appears to be empty.');
+          setImportRows([]);
+          return;
+        }
+
+        const parsed = [];
+        for (const row of rawJson) {
+          let code = '';
+          let name = '';
+          let uom = 'Nos';
+          let size = '';
+          let packing = '';
+
+          // Normalize keys across case & spaces
+          for (const [rawKey, rawVal] of Object.entries(row)) {
+            const cleanKey = String(rawKey).toLowerCase().replace(/[^a-z0-9]/g, '');
+            const strVal = String(rawVal).trim();
+
+            if (cleanKey.includes('productcode') || cleanKey === 'code' || cleanKey === 'itemcode' || cleanKey === 'fgcode') {
+              code = strVal;
+            } else if (cleanKey.includes('productname') || cleanKey === 'name' || cleanKey === 'itemname') {
+              name = strVal;
+            } else if (cleanKey === 'uom' || cleanKey === 'unit') {
+              uom = strVal || 'Nos';
+            } else if (cleanKey.includes('size') || cleanKey === 'variant') {
+              size = strVal;
+            } else if (cleanKey.includes('pack')) {
+              packing = strVal;
+            }
+          }
+
+          if (code || name) {
+            parsed.push({ code, name, uom, size, packing });
+          }
+        }
+
+        if (parsed.length === 0) {
+          setImportError('Could not find recognizable columns. Ensure columns are named: Product Code, Product Name, UOM, Sizes, Packing');
+          setImportRows([]);
+        } else {
+          setImportRows(parsed);
+        }
+      } catch (err) {
+        console.error('File parse error:', err);
+        setImportError('Failed to parse file. Please upload a valid .xlsx or .xls file.');
+        setImportRows([]);
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
+  // ==========================================
+  // Confirm & Send to Backend
+  // ==========================================
+  const handleConfirmImport = async () => {
+    if (importRows.length === 0) return;
+    setImporting(true);
+    setImportError('');
+
+    try {
+      const res = await apiFetch('/products/import-excel', {
+        method: 'POST',
+        body: JSON.stringify({ items: importRows })
+      });
+
+      if (res.success) {
+        alert(res.message || 'Products imported successfully!');
+        setIsImportModalOpen(false);
+        setImportRows([]);
+        setImportFileName('');
+        fetchProducts(false);
+      } else {
+        setImportError(res.message || 'Import failed. Please try again.');
+      }
+    } catch (err) {
+      setImportError('Network error: ' + err.message);
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const renderCell = (col, product) => {
     switch (col.id) {
       case 'code':
@@ -488,9 +699,36 @@ export default function ProductsPage() {
       title="Products"
       subtitle="Complete Product Master"
       aside={
-        <div className="count-chip">
-          <span className="chip-ic"><Icon name="box" size={26} color="#fff" /></span>
-          <div><strong>{loading ? '…' : products.length}</strong><span>Total Products</span></div>
+        <div className="products-head-row">
+          <div className="count-chip">
+            <span className="chip-ic"><Icon name="box" size={26} color="#fff" /></span>
+            <div><strong>{loading ? '…' : products.length}</strong><span>Total Products</span></div>
+          </div>
+
+          <div className="excel-actions">
+            <button
+              type="button"
+              className="excel-btn excel-btn-import"
+              onClick={() => {
+                setIsImportModalOpen(true);
+                setImportError('');
+              }}
+              title="Import multiple Products from Excel"
+            >
+              <Upload size={17} strokeWidth={2.4} />
+              <span>Import From Excel</span>
+            </button>
+
+            <button
+              type="button"
+              className="excel-btn excel-btn-export"
+              onClick={handleExportExcel}
+              title="Export all Products to Excel"
+            >
+              <Download size={17} strokeWidth={2.4} />
+              <span>Export Excel</span>
+            </button>
+          </div>
         </div>
       }
     >
@@ -713,10 +951,166 @@ export default function ProductsPage() {
               <div className="modal-actions">
                 <button type="button" className="btn btn-outline" onClick={() => setIsModalOpen(false)}>Cancel</button>
                 <button type="submit" className="btn btn-primary" disabled={submitting}>
-                  {submitting ? 'Saving...' : 'Save & Sync MongoDB'}
+                  {submitting ? 'Saving...' : 'Save & Sync Database'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Import From Excel Modal */}
+      {isImportModalOpen && (
+        <div className="modal-overlay" onClick={() => !importing && setIsImportModalOpen(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '44rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.7rem' }}>
+                <span style={{ width: '2.5rem', height: '2.5rem', borderRadius: '0.5rem', background: '#ecfdf5', color: '#107c41', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <FileSpreadsheet size={24} strokeWidth={2.2} />
+                </span>
+                <div>
+                  <h3 className="modal-title" style={{ margin: 0 }}>Import Products From Excel</h3>
+                  <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748b' }}>
+                    Upload Excel (.xlsx, .xls) containing multiple products
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => !importing && setIsImportModalOpen(false)}
+                style={{ border: 'none', background: 'transparent', padding: '0.2rem', color: '#94a3b8', cursor: 'pointer' }}
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ background: '#f8fafc', borderRadius: '0.6rem', padding: '0.75rem 1rem', border: '1px solid #e2e8f0', margin: '0.85rem 0 1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div style={{ fontSize: '0.84rem', color: '#334155' }}>
+                  <strong>Columns:</strong> <code>Product Code</code>, <code>Product Name</code>, <code>UOM</code>, <code>Sizes</code>, <code>Packing</code>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDownloadSample}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#0284c7',
+                    fontWeight: 600,
+                    fontSize: '0.83rem',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    textDecoration: 'underline'
+                  }}
+                >
+                  <Download size={14} /> Download Sample Template
+                </button>
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.35rem' }}>
+                ★ <em>Rule:</em> Treated as a unique item if <strong>Product Code</strong> is unique. Existing product codes will be updated with new packings/sizes; new product codes will be added to the catalog.
+              </div>
+            </div>
+
+            {/* Dropzone */}
+            <div className="excel-dropzone" onClick={() => document.getElementById('productExcelInput').click()}>
+              <Upload size={32} color="#107c41" style={{ marginBottom: '0.5rem' }} />
+              <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#1e293b', marginBottom: '0.2rem' }}>
+                {importFileName ? importFileName : 'Click to choose or drag & drop Excel file'}
+              </div>
+              <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>
+                Supports .xlsx and .xls
+              </div>
+              <input
+                type="file"
+                id="productExcelInput"
+                accept=".xlsx, .xls, .csv"
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
+              />
+            </div>
+
+            {importError && (
+              <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '0.5rem', padding: '0.65rem 0.9rem', color: '#b91c1c', fontSize: '0.85rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <AlertCircle size={16} />
+                <span>{importError}</span>
+              </div>
+            )}
+
+            {/* Preview Section */}
+            {importRows.length > 0 && (
+              <div style={{ marginBottom: '1rem' }}>
+                <div className="excel-badge-bar">
+                  <span className="excel-badge-item">
+                    <span>Total Rows:</span>
+                    <strong>{importRows.length}</strong>
+                  </span>
+                  <span className="excel-badge-item">
+                    <span>Unique Product Codes:</span>
+                    <strong>{new Set(importRows.map(r => r.code).filter(Boolean)).size}</strong>
+                  </span>
+                </div>
+
+                <div style={{ maxHeight: '12rem', overflowY: 'auto', background: '#ffffff', borderRadius: '0.5rem', border: '1px solid #e2e8f0' }}>
+                  <table style={{ width: '100%', fontSize: '0.78rem', textAlign: 'left', borderCollapse: 'collapse' }}>
+                    <thead style={{ position: 'sticky', top: 0, background: '#f1f5f9', zIndex: 1 }}>
+                      <tr>
+                        <th style={{ padding: '0.45rem 0.6rem', borderBottom: '1px solid #cbd5e1' }}>Product Code</th>
+                        <th style={{ padding: '0.45rem 0.6rem', borderBottom: '1px solid #cbd5e1' }}>Product Name</th>
+                        <th style={{ padding: '0.45rem 0.6rem', borderBottom: '1px solid #cbd5e1' }}>UOM</th>
+                        <th style={{ padding: '0.45rem 0.6rem', borderBottom: '1px solid #cbd5e1' }}>Sizes</th>
+                        <th style={{ padding: '0.45rem 0.6rem', borderBottom: '1px solid #cbd5e1' }}>Packing</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importRows.slice(0, 10).map((row, idx) => (
+                        <tr key={idx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '0.4rem 0.6rem', fontWeight: 600, color: '#0284c7' }}>{row.code || '-'}</td>
+                          <td style={{ padding: '0.4rem 0.6rem', color: '#1e293b' }}>{row.name || '-'}</td>
+                          <td style={{ padding: '0.4rem 0.6rem', color: '#64748b' }}>{row.uom || 'Nos'}</td>
+                          <td style={{ padding: '0.4rem 0.6rem' }}><span className="size-chip" style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem' }}>{row.size || '-'}</span></td>
+                          <td style={{ padding: '0.4rem 0.6rem' }}><span className="packing-chip" style={{ fontSize: '0.72rem', padding: '0.1rem 0.35rem' }}>{row.packing || '-'}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {importRows.length > 10 && (
+                    <div style={{ textAlign: 'center', padding: '0.4rem', fontSize: '0.75rem', color: '#94a3b8', background: '#f8fafc' }}>
+                      ...and {importRows.length - 10} more rows
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="modal-actions" style={{ marginTop: '1.25rem' }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setIsImportModalOpen(false)}
+                disabled={importing}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ background: '#107c41', borderColor: '#0d6534', minWidth: '12rem' }}
+                onClick={handleConfirmImport}
+                disabled={importing || importRows.length === 0}
+              >
+                {importing ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <span className="spin">⏳</span> Importing...
+                  </span>
+                ) : (
+                  `Import ${importRows.length} Products & Sync`
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

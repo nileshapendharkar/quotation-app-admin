@@ -767,3 +767,103 @@ select.status-select { height: 2.1rem; border-radius: 0.35rem; padding: 0 2rem 0
 
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 1s linear infinite; }
+
+/* ==========================================================================
+   Excel Import / Export Toolbar & Modal
+   ========================================================================== */
+.products-head-row {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.excel-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.excel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.62rem 1.2rem;
+  border-radius: 0.65rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.excel-btn-import {
+  background: linear-gradient(135deg, #107c41 0%, #15803d 100%);
+  color: #ffffff;
+  border: 1px solid #0d6534;
+  box-shadow: 0 2px 8px rgba(16, 124, 65, 0.28);
+}
+.excel-btn-import:hover {
+  background: linear-gradient(135deg, #0d6534 0%, #166534 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(16, 124, 65, 0.35);
+}
+
+.excel-btn-export {
+  background: #ffffff;
+  color: #107c41;
+  border: 1.5px solid #107c41;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+.excel-btn-export:hover {
+  background: #f0fdf4;
+  border-color: #0d6534;
+  color: #0d6534;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 124, 65, 0.15);
+}
+
+.excel-dropzone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 0.75rem;
+  padding: 1.6rem 1.25rem;
+  text-align: center;
+  background: #f8fafc;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+.excel-dropzone:hover, .excel-dropzone.drag-active {
+  border-color: #107c41;
+  background: #f0fdf4;
+}
+
+.excel-badge-bar {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 0.85rem;
+  flex-wrap: wrap;
+}
+.excel-badge-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  font-size: 0.82rem;
+  color: #334155;
+  font-weight: 500;
+}
+.excel-badge-item strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+
