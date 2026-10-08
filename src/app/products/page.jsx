@@ -75,7 +75,8 @@ export default function ProductsPage() {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
 
-  // Product Selection for Export
+  // Product Selection for Export (Visible only when Export Excel is clicked)
+  const [isExportMode, setIsExportMode] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState(new Set());
 
   useEffect(() => {
@@ -410,6 +411,16 @@ export default function ProductsPage() {
     setSelectedProductIds(new Set());
   };
 
+  const handleStartExportMode = () => {
+    setIsExportMode(true);
+    setSelectedProductIds(new Set());
+  };
+
+  const handleCancelExportMode = () => {
+    setIsExportMode(false);
+    setSelectedProductIds(new Set());
+  };
+
   // ==========================================
   // Excel Export Feature (Multiple / Selected / All)
   // ==========================================
@@ -475,6 +486,8 @@ export default function ProductsPage() {
         : `Products_Master_${dateStr}.xlsx`;
 
       XLSX.writeFile(workbook, fileName);
+      setIsExportMode(false);
+      setSelectedProductIds(new Set());
     } catch (err) {
       console.error('Export error:', err);
       alert('Failed to export Excel: ' + err.message);
@@ -762,72 +775,111 @@ export default function ProductsPage() {
               <span>Import From Excel</span>
             </button>
 
-            {selectedProductIds.size > 0 ? (
-              <>
-                <button
-                  type="button"
-                  className="excel-btn excel-btn-import"
-                  onClick={() => handleExportExcel(true)}
-                  title={`Export ${selectedProductIds.size} selected products to Excel`}
-                >
-                  <Download size={17} strokeWidth={2.4} />
-                  <span>Export Selected ({selectedProductIds.size})</span>
-                </button>
-                <button
-                  type="button"
-                  className="excel-btn excel-btn-export"
-                  onClick={() => handleExportExcel(false)}
-                  title={`Export all ${products.length} products to Excel`}
-                >
-                  <Download size={17} strokeWidth={2.4} />
-                  <span>Export All</span>
-                </button>
-              </>
-            ) : (
+            {!isExportMode ? (
               <button
                 type="button"
                 className="excel-btn excel-btn-export"
-                onClick={() => handleExportExcel(false)}
-                title="Export all Products to Excel"
+                onClick={handleStartExportMode}
+                title="Select products and export to Excel"
               >
                 <Download size={17} strokeWidth={2.4} />
                 <span>Export Excel</span>
               </button>
+            ) : (
+              <>
+                {selectedProductIds.size > 0 ? (
+                  <button
+                    type="button"
+                    className="excel-btn excel-btn-import"
+                    onClick={() => handleExportExcel(true)}
+                    title={`Export ${selectedProductIds.size} selected products to Excel`}
+                  >
+                    <Download size={17} strokeWidth={2.4} />
+                    <span>Export Selected ({selectedProductIds.size})</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="excel-btn excel-btn-export"
+                    onClick={() => handleExportExcel(false)}
+                    title={`Export all ${products.length} products to Excel`}
+                  >
+                    <Download size={17} strokeWidth={2.4} />
+                    <span>Export All ({products.length})</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="excel-btn excel-btn-export"
+                  style={{ borderColor: '#ef4444', color: '#dc2626', background: '#fef2f2' }}
+                  onClick={handleCancelExportMode}
+                  title="Close export selection mode"
+                >
+                  <X size={17} strokeWidth={2.4} />
+                  <span>Cancel</span>
+                </button>
+              </>
             )}
           </div>
         </div>
       }
     >
       <div className="ds-card">
-        {/* Selection notification bar */}
-        {selectedProductIds.size > 0 && (
+        {/* Selection notification bar (visible ONLY when Export Excel mode is active) */}
+        {isExportMode && (
           <div className="selection-bar">
             <div className="selection-bar-left">
-              <span>✓ <strong>{selectedProductIds.size}</strong> of {products.length} products selected</span>
+              {selectedProductIds.size > 0 ? (
+                <span>✓ <strong>{selectedProductIds.size}</strong> of {products.length} products selected</span>
+              ) : (
+                <span>Tick the checkboxes below to select products for Excel export (or click <strong>Export All</strong>)</span>
+              )}
             </div>
             <div className="selection-bar-actions">
-              {!isAllSelected && (
+              <button
+                type="button"
+                className="btn-selection-action"
+                onClick={handleToggleSelectAll}
+              >
+                {isAllSelected ? 'Deselect All' : `Select All (${products.length})`}
+              </button>
+              {selectedProductIds.size > 0 && (
                 <button
                   type="button"
                   className="btn-selection-action"
-                  onClick={handleToggleSelectAll}
+                  onClick={handleClearSelection}
                 >
-                  Select All ({products.length})
+                  Clear Selection
                 </button>
               )}
               <button
                 type="button"
-                className="btn-selection-action"
-                onClick={handleClearSelection}
+                className="btn-selection-action primary"
+                disabled={selectedProductIds.size === 0}
+                style={{
+                  opacity: selectedProductIds.size === 0 ? 0.6 : 1,
+                  cursor: selectedProductIds.size === 0 ? 'not-allowed' : 'pointer'
+                }}
+                onClick={() => {
+                  if (selectedProductIds.size > 0) handleExportExcel(true);
+                }}
               >
-                Clear Selection
+                <Download size={14} /> Export Selected ({selectedProductIds.size})
               </button>
               <button
                 type="button"
-                className="btn-selection-action primary"
-                onClick={() => handleExportExcel(true)}
+                className="btn-selection-action"
+                onClick={() => handleExportExcel(false)}
               >
-                <Download size={14} /> Export Selected ({selectedProductIds.size})
+                <Download size={14} /> Export All Products
+              </button>
+              <button
+                type="button"
+                className="btn-selection-action"
+                style={{ borderColor: '#fca5a5', color: '#dc2626', background: '#fef2f2' }}
+                onClick={handleCancelExportMode}
+              >
+                <X size={14} /> Cancel
               </button>
             </div>
           </div>
@@ -902,17 +954,19 @@ export default function ProductsPage() {
           <table className="ds-table">
             <thead>
               <tr>
-                <th className="select-col" style={{ width: '3.2rem', textAlign: 'center' }}>
-                  <input
-                    type="checkbox"
-                    className="row-checkbox"
-                    checked={isAllSelected}
-                    ref={el => { if (el) el.indeterminate = isIndeterminate; }}
-                    onChange={handleToggleSelectAll}
-                    title={isAllSelected ? "Deselect All Products" : "Select All Products"}
-                    aria-label="Select all products"
-                  />
-                </th>
+                {isExportMode && (
+                  <th className="select-col" style={{ width: '3.2rem', textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      className="row-checkbox"
+                      checked={isAllSelected}
+                      ref={el => { if (el) el.indeterminate = isIndeterminate; }}
+                      onChange={handleToggleSelectAll}
+                      title={isAllSelected ? "Deselect All Products" : "Select All Products"}
+                      aria-label="Select all products"
+                    />
+                  </th>
+                )}
                 {visibleCols.map(col => (
                   <th key={col.id} className={col.id === 'actions' ? 'center' : ''} style={{
                     width: col.id === 'image' ? '7rem' : col.id === 'actions' ? '14rem' : undefined,
@@ -925,20 +979,22 @@ export default function ProductsPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={visibleCols.length + 1} className="empty-cell">Loading products...</td></tr>
+                <tr><td colSpan={visibleCols.length + (isExportMode ? 1 : 0)} className="empty-cell">Loading products...</td></tr>
               ) : pagedProducts.map(product => {
                 const isSelected = selectedProductIds.has(product.id);
                 return (
-                  <tr key={product.id} className={isSelected ? 'selected-row' : ''}>
-                    <td className="select-col" style={{ textAlign: 'center' }}>
-                      <input
-                        type="checkbox"
-                        className="row-checkbox"
-                        checked={isSelected}
-                        onChange={() => handleToggleRow(product.id)}
-                        aria-label={`Select product ${product.name}`}
-                      />
-                    </td>
+                  <tr key={product.id} className={isExportMode && isSelected ? 'selected-row' : ''}>
+                    {isExportMode && (
+                      <td className="select-col" style={{ textAlign: 'center' }}>
+                        <input
+                          type="checkbox"
+                          className="row-checkbox"
+                          checked={isSelected}
+                          onChange={() => handleToggleRow(product.id)}
+                          aria-label={`Select product ${product.name}`}
+                        />
+                      </td>
+                    )}
                     {visibleCols.map(col => (
                       <td key={col.id} className={col.id === 'actions' ? 'center' : ''}>
                         {renderCell(col, product)}
