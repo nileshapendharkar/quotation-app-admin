@@ -6,7 +6,8 @@ export const getImageUrl = (path) => {
   if (!path) return 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=500&q=80';
   if (path.startsWith('http') || path.startsWith('data:')) return path;
   const baseUrl = API_BASE.replace('/api', '');
-  return `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  return `${baseUrl}${encodeURI(cleanPath)}`;
 };
 
 export async function apiFetch(endpoint, options = {}) {

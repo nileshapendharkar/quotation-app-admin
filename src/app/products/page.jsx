@@ -722,7 +722,19 @@ export default function ProductsPage() {
       case 'image':
         return (
           <div className="thumb">
-            <img src={getImageUrl(product.image)} alt={product.name} />
+            <img 
+              src={getImageUrl(product.image)} 
+              alt={product.name}
+              loading="lazy"
+              onError={(e) => {
+                const currentSrc = e.currentTarget.src;
+                if (currentSrc.includes('.webp')) {
+                  e.currentTarget.src = currentSrc.replace(/\.webp($|\?)/, '.png$1');
+                } else if (!currentSrc.includes('unsplash')) {
+                  e.currentTarget.src = 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=500&q=80';
+                }
+              }}
+            />
           </div>
         );
       case 'description':
@@ -1107,7 +1119,18 @@ export default function ProductsPage() {
                 <label className="form-label">Product Image</label>
                 {formImage ? (
                   <div className="img-preview">
-                    <img src={getImageUrl(formImage)} alt="Preview" />
+                    <img 
+                      src={getImageUrl(formImage)} 
+                      alt="Preview"
+                      onError={(e) => {
+                        const currentSrc = e.currentTarget.src;
+                        if (currentSrc.includes('.webp')) {
+                          e.currentTarget.src = currentSrc.replace(/\.webp($|\?)/, '.png$1');
+                        } else if (!currentSrc.includes('unsplash')) {
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=500&q=80';
+                        }
+                      }}
+                    />
                     <button type="button" className="btn btn-sm btn-soft-red" onClick={() => setFormImage('')} style={{ position: 'absolute', top: 8, right: 8 }}>
                       Clear
                     </button>

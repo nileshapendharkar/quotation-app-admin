@@ -182,7 +182,18 @@ export default function CategoriesPage() {
                 <tr key={cat.id}>
                   <td style={{ paddingLeft: '2rem', paddingTop: '0.4rem', paddingBottom: '0.4rem' }}>
                     <div className="thumb sm">
-                      <img src={getImageUrl(cat.image)} alt={cat.name} />
+                      <img 
+                        src={getImageUrl(cat.image)} 
+                        alt={cat.name} 
+                        onError={(e) => {
+                          const currentSrc = e.currentTarget.src;
+                          if (currentSrc.includes('.webp')) {
+                            e.currentTarget.src = currentSrc.replace(/\.webp($|\?)/, '.png$1');
+                          } else if (!currentSrc.includes('unsplash')) {
+                            e.currentTarget.src = 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=500&q=80';
+                          }
+                        }}
+                      />
                     </div>
                   </td>
                   <td>{cat.name}</td>
@@ -236,7 +247,18 @@ export default function CategoriesPage() {
                 <label className="form-label">Image URL</label>
                 {formImage && (
                   <div className="img-preview">
-                    <img src={getImageUrl(formImage)} alt="Preview" />
+                    <img 
+                      src={getImageUrl(formImage)} 
+                      alt="Preview" 
+                      onError={(e) => {
+                        const currentSrc = e.currentTarget.src;
+                        if (currentSrc.includes('.webp')) {
+                          e.currentTarget.src = currentSrc.replace(/\.webp($|\?)/, '.png$1');
+                        } else if (!currentSrc.includes('unsplash')) {
+                          e.currentTarget.src = 'https://images.unsplash.com/photo-1578575437130-527eed3abbec?w=500&q=80';
+                        }
+                      }}
+                    />
                   </div>
                 )}
                 <input type="url" className="field" placeholder="https://..." value={formImage} onChange={(e) => setFormImage(e.target.value)} />
